@@ -29,10 +29,6 @@ module Control.Monad.Constrained
   , (<*)
   , some
   , many
-  , liftA2
-  , liftA3
-  , liftA4
-  , liftA5
   ,
    -- * Syntax
    ifThenElse
@@ -94,11 +90,52 @@ class Functor f =>
     default (<*>) :: Prelude.Applicative f => f (a -> b) -> f a -> f b
     (<*>) = (Prelude.<*>)
     infixl 4 *>
-    (*>) :: (Suitable f b) => f a -> f b -> f b
-    default (*>) :: Prelude.Applicative f => f a -> f b -> f b
-    (*>) = (Prelude.*>)
+    (*>)
+        :: Suitable f b
+        => f a -> f b -> f b
+    (*>) = liftA2 (flip const)
     {-# INLINE (*>) #-}
-    liftA :: Suitable f b => (Vect xs -> b) -> AppVect f xs -> f b
+    liftA
+        :: Suitable f b
+        => (Vect xs -> b) -> AppVect f xs -> f b
+    liftA2
+        :: Suitable f c
+        => (a -> b -> c) -> f a -> f b -> f c
+    liftA2 f xs ys =
+        liftA
+            (\(x :- One y) ->
+                  f x y)
+            (xs :* OneA ys)
+    liftA3
+        :: Suitable f d
+        => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
+    liftA3 f xs ys zs =
+        liftA
+            (\(x :- y :- One z) ->
+                  f x y z)
+            (xs :* ys :* OneA zs)
+    liftA4
+        :: Suitable f e
+        => (a -> b -> c -> d -> e) -> f a -> f b -> f c -> f d -> f e
+    liftA4 f ws xs ys zs =
+        liftA
+            (\(w :- x :- y :- One z) ->
+                  f w x y z)
+            (ws :* xs :* ys :* OneA zs)
+    liftA5
+        :: Suitable f g
+        => (a -> b -> c -> d -> e -> g)
+        -> f a
+        -> f b
+        -> f c
+        -> f d
+        -> f e
+        -> f g
+    liftA5 f vs ws xs ys zs =
+        liftA
+            (\(v :- w :- x :- y :- One z) ->
+                  f v w x y z)
+            (vs :* ws :* xs :* ys :* OneA zs)
 
 liftA' :: (Prelude.Applicative f) => (Vect xs -> b) -> (AppVect f xs -> f b)
 liftA' f (OneA xs) = Prelude.fmap (f . One) xs
@@ -143,18 +180,6 @@ class (Foldable t, Functor t) =>
 --------------------------------------------------------------------------------
 -- useful functions
 --------------------------------------------------------------------------------
-
-liftA2 :: (Applicative f, Suitable f c) => (a -> b -> c) -> f a -> f b -> f c
-liftA2 f xs ys = liftA (\(x :- One y) -> f x y) (xs :* OneA ys)
-
-liftA3 :: (Applicative f, Suitable f d) => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-liftA3 f xs ys zs = liftA (\(x :- y :- One z) -> f x y z) (xs :* ys :* OneA zs)
-
-liftA4 :: (Applicative f, Suitable f e) => (a -> b -> c -> d -> e) -> f a -> f b -> f c -> f d -> f e
-liftA4 f ws xs ys zs = liftA (\(w :- x :- y :- One z) -> f w x y z) (ws :* xs :* ys :* OneA zs)
-
-liftA5 :: (Applicative f, Suitable f g) => (a -> b -> c -> d -> e -> g) -> f a -> f b -> f c -> f d -> f e -> f g
-liftA5 f vs ws xs ys zs = liftA (\(v :- w :- x :- y :- One z) -> f v w x y z) (vs :* ws :* xs :* ys :* OneA zs)
 
 infixl 4 <$>
 (<$>) :: (Functor f, Suitable f b) => (a -> b) -> f a -> f b
@@ -375,24 +400,30 @@ instance (Functor m) => Functor (ReaderT r m) where
     fmap f  = mapReaderT (fmap f)
     {-# INLINE fmap #-}
 
--- instance (Applicative m) => Applicative (ReaderT r m) where
---     pure = liftReaderT . pure
---     {-# INLINE pure #-}
---     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
---     {-# INLINE (<*>) #-}
+instance (Applicative m) => Applicative (ReaderT r m) where
+    pure = liftReaderT . pure
+    {-# INLINE pure #-}
+    f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
+    {-# INLINE (<*>) #-}
+    liftA f ys = ReaderT $ \r -> liftA f (tr r ys) where
+      tr :: Functor m => r -> AppVect (ReaderT r m) xs -> AppVect m xs
+      tr r (OneA xs) = OneA (runReaderT xs r)
+      tr r (x :* xs) = runReaderT x r :* tr r xs
+    _ *> x = x
 
--- instance (Alternative m) => Alternative (ReaderT r m) where
---     empty   = liftReaderT empty
---     {-# INLINE empty #-}
---     m <|> n = ReaderT $ \ r -> runReaderT m r <|> runReaderT n r
---     {-# INLINE (<|>) #-}
+instance (Alternative m) => Alternative (ReaderT r m) where
+    empty   = liftReaderT empty
+    {-# INLINE empty #-}
+    m <|> n = ReaderT $ \ r -> runReaderT m r <|> runReaderT n r
+    {-# INLINE (<|>) #-}
 
--- instance (Monad m) => Monad (ReaderT r m) where
---     m >>= k  = ReaderT $ \ r -> do
---         a <- runReaderT m r
---         runReaderT (k a) r
---     {-# INLINE (>>=) #-}
+instance (Monad m) => Monad (ReaderT r m) where
+    m >>= k  = ReaderT $ \ r -> do
+        a <- runReaderT m r
+        runReaderT (k a) r
+    {-# INLINE (>>=) #-}
+    join (ReaderT x) = ReaderT $ \r -> x r >>= flip runReaderT r
 
--- liftReaderT :: m a -> ReaderT r m a
--- liftReaderT m = ReaderT (const m)
--- {-# INLINE liftReaderT #-}
+liftReaderT :: m a -> ReaderT r m a
+liftReaderT m = ReaderT (const m)
+{-# INLINE liftReaderT #-}
