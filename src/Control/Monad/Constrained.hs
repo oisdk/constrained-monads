@@ -18,35 +18,38 @@ module Control.Monad.Constrained
   ,Alternative(..)
   ,Traversable(..)
   ,
+   -- * Horrible type-level stuff
+   Vect(..)
+  ,AppVect(..)
+  ,
    -- * Useful functions
    guard
-  , (<$>)
-  , (=<<)
-  , (<=<)
-  , (>=>)
-  , foldM
-  , traverse_
-  , replicateM
-  , void
-  , (<$)
-  , (<*)
-  , some
-  , many
+  ,(<$>)
+  ,(=<<)
+  ,(<=<)
+  ,(>=>)
+  ,foldM
+  ,traverse_
+  ,replicateM
+  ,void
+  ,(<$)
+  ,(<*)
+  ,some
+  ,many
   ,
    -- * Syntax
    ifThenElse
   ,fail
   ,(>>)
   ,return
-  ,
-   -- * Rest of Prelude
-   module RestPrelude)
+  ,module RestPrelude)
   where
 
 import           GHC.Exts
 
 import Prelude as RestPrelude
-       hiding (Applicative(..), Functor(..), Monad(..), (<$>), Traversable(..), (=<<))
+       hiding (Applicative(..), Functor(..), Monad(..), (<$>),
+               Traversable(..), (=<<))
 
 import qualified Prelude
 import qualified Control.Applicative
