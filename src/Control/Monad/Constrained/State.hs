@@ -13,6 +13,7 @@ import qualified Control.Monad.Trans.State.Strict as State.Strict
 import qualified Control.Monad.Trans.Maybe as Maybe
 
 
+
 class Monad m =>
       MonadState s m  | m -> s where
     {-# MINIMAL state #-}
@@ -38,4 +39,6 @@ instance Monad m => MonadState s (State.Lazy.StateT s m) where
   state f = State.Lazy.StateT (pure . f)
 
 instance MonadState s m => MonadState s (Maybe.MaybeT m) where
+  get = lift get
+  put = lift  . put
   

@@ -70,6 +70,7 @@ import Control.Monad.Trans.Reader (ReaderT(..), mapReaderT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT(..))
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
+import Control.Monad.Trans.Identity (IdentityT(..))
 
 --------------------------------------------------------------------------------
 -- Type-level shenanigans
@@ -674,3 +675,23 @@ instance Monad m => Monad (ExceptT e m) where
 instance (Monad m, Monoid e) => Alternative (ExceptT e m) where
   empty = ExceptT (pure (Left mempty))
   ExceptT xs <|> ExceptT ys = ExceptT (xs >>= either (const ys) (pure . Right))
+
+instance Functor m =>
+         Functor (IdentityT m) where
+    type Suitable (IdentityT m) a = Suitable m a
+    fmap =
+        (coerce :: ((a -> b) -> f a -> f b) -> (a -> b) -> IdentityT f a -> IdentityT f b)
+            fmap
+
+instance Applicative m =>
+         Applicative (IdentityT m) where
+    pure = (coerce :: (a -> f a) -> a -> IdentityT f a) pure
+    (<*>) =
+        (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
+            (<*>)
+    liftA f =
+        (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
+            (liftA f)
+instance Monad m => Monad (IdentityT m) where
+  (>>=) = (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b) (>>=)
+  join (IdentityT xs) = IdentityT (xs >>= runIdentityT)

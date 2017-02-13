@@ -5,10 +5,14 @@
 module Control.Monad.Constrained.Trans where
 
 import           Control.Monad.Constrained
-import           Control.Monad.Cont        (ContT (..))
-import           Control.Monad.Reader      (ReaderT (..))
-import           Control.Monad.State       (StateT (..))
 import           GHC.Exts
+import Control.Monad.Trans.Cont (ContT(..))
+import Control.Monad.Trans.Reader (ReaderT(..))
+import Control.Monad.Trans.State.Strict as Strict (StateT(..))
+import Control.Monad.Trans.State.Lazy as Lazy (StateT(..))
+import Control.Monad.Trans.Identity (IdentityT(..))
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans.Except (ExceptT(..))
 
 class MonadTrans t where
   type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) a :: Constraint
@@ -24,7 +28,29 @@ instance MonadTrans (ReaderT r) where
     lift m = ReaderT (const m)
     {-# INLINE lift #-}
 
-instance MonadTrans (StateT r) where
-    type SuitableLift (StateT r) m a = Suitable m (a,r)
-    lift m = StateT (\s -> fmap (flip (,) s) m)
+instance MonadTrans (Strict.StateT r) where
+    type SuitableLift (Strict.StateT r) m a = Suitable m (a,r)
+    lift m = Strict.StateT (\s -> fmap (flip (,) s) m)
     {-# INLINE lift #-}
+
+instance MonadTrans (Lazy.StateT r) where
+    type SuitableLift (Lazy.StateT r) m a = Suitable m (a,r)
+    lift m = Lazy.StateT (\s -> fmap (flip (,) s) m)
+    {-# INLINE lift #-}
+
+instance MonadTrans IdentityT where
+    type SuitableLift IdentityT m a = Suitable m a
+    lift = IdentityT
+    {-# INLINE lift #-}
+
+instance MonadTrans MaybeT where
+    type SuitableLift MaybeT m a = Suitable m (Maybe a)
+    lift = MaybeT . fmap Just
+    {-# INLINE lift #-}
+
+instance MonadTrans (ExceptT e) where
+    type SuitableLift (ExceptT e) m a = Suitable m (Either e a)
+    lift = ExceptT . fmap Right
+    {-# INLINE lift #-}
+
+
