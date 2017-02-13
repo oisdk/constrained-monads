@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE RebindableSyntax     #-}
 {-# LANGUAGE TypeFamilies         #-}
@@ -67,15 +68,22 @@ import Control.Monad.Trans.Cont (ContT)
 import Control.Monad.Trans.State (StateT(..))
 import Control.Monad.Trans.Reader (ReaderT(..), mapReaderT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT(..))
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 
 --------------------------------------------------------------------------------
 -- Type-level shenanigans
 --------------------------------------------------------------------------------
+
+-- | A heterogeneous list, for storing the arguments to 'liftA'. (There /has/ to
+-- be a better way to do this).
 infixr 5 :-
 data Vect xs where
   One  :: x -> Vect '[x]
   (:-) :: x -> Vect xs -> Vect (x ': xs)
 
+-- | Another heterogeneous list, for storing the arguments to 'liftA', wrapped
+-- in their applicatives.
 infixr 5 :*
 data AppVect f xs where
   OneA :: f x -> AppVect f '[x]
@@ -307,7 +315,7 @@ class Applicative f =>
 
 class Applicative f =>
       Alternative f  where
-    empty :: f a
+    empty :: Suitable f a => f a
     {-# INLINE empty #-}
     default empty :: Control.Applicative.Alternative f => f a
     empty = Control.Applicative.empty
@@ -443,8 +451,8 @@ instance Monad Identity
 instance Traversable Identity where
   traverse f (Identity x) = fmap Identity (f x)
 
-instance Functor (Either a) where
-    type Suitable (Either a) a = ()
+instance Functor (Either e) where
+    type Suitable (Either e) a = ()
 instance Applicative (Either a) where liftA = liftA'
 instance Monad (Either a)
 instance Traversable (Either a) where
@@ -545,7 +553,7 @@ instance (Monad m) => Monad (Strict.StateT s m) where
         Strict.runStateT (k a) s'
     {-# INLINE (>>=) #-}
     join (Strict.StateT xs) = Strict.StateT $ \s -> do
-      ~(x,s') <- xs s
+      (x,s') <- xs s
       Strict.runStateT x s'
     {-# INLINE join #-}
 
@@ -627,3 +635,42 @@ liftReaderT :: m a -> ReaderT r m a
 liftReaderT m = ReaderT (const m)
 {-# INLINE liftReaderT #-}
 
+instance Functor m => Functor (MaybeT m) where
+  type Suitable (MaybeT m) a = Suitable m (Maybe a)
+  fmap f (MaybeT xs) = MaybeT ((fmap.fmap) f xs)
+
+instance Monad m => Applicative (MaybeT m) where
+  pure x = MaybeT (pure (Just x))
+  MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
+  liftA f (OneA xs) = fmap (f . One) xs
+  liftA f (x :* xs) = MaybeT $ runMaybeT x >>= \case
+      Nothing -> pure Nothing
+      Just x' -> runMaybeT (liftA (f . (x':-)) xs)
+
+instance Monad m => Monad (MaybeT m) where
+  MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
+  join = MaybeT . (maybe (pure Nothing) runMaybeT <=< runMaybeT)
+
+instance Monad m => Alternative (MaybeT m) where
+  empty = MaybeT (pure Nothing)
+  MaybeT x <|> MaybeT y = MaybeT (x >>= maybe y (pure . Just))
+
+instance Functor m => Functor (ExceptT e m) where
+  type Suitable (ExceptT e m) a = Suitable m (Either e a)
+  fmap f (ExceptT xs) = ExceptT ((fmap.fmap) f xs)
+
+instance Monad m => Applicative (ExceptT e m) where
+  pure x = ExceptT (pure (Right x))
+  ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
+  liftA f (OneA xs) = fmap (f . One) xs
+  liftA f (ExceptT x :* xs) = ExceptT $ x >>= \case
+      Left x' -> pure (Left x')
+      Right x' -> runExceptT (liftA (f . (x':-)) xs)
+
+instance Monad m => Monad (ExceptT e m) where
+  ExceptT xs >>= f = ExceptT (xs >>= either (pure . Left) (runExceptT . f))
+  join = ExceptT . (either (pure . Left) runExceptT <=< runExceptT)
+
+instance (Monad m, Monoid e) => Alternative (ExceptT e m) where
+  empty = ExceptT (pure (Left mempty))
+  ExceptT xs <|> ExceptT ys = ExceptT (xs >>= either (const ys) (pure . Right))
