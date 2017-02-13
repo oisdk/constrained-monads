@@ -1,9 +1,12 @@
-{-# LANGUAGE UndecidableInstances     #-}
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE RebindableSyntax  #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE RebindableSyntax     #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE GADTs                #-}
 
 -- | A module for constrained monads (set, etc)
 module Control.Monad.Constrained
@@ -57,17 +60,50 @@ import qualified Data.Set as Set
 import Data.IntMap.Strict (IntMap)
 import Data.Sequence (Seq)
 
-import Control.Monad.Cont (ContT)
-import Control.Monad.State (StateT(..))
-import Control.Monad.Reader (ReaderT(..), mapReaderT)
+import Control.Monad.Trans.Cont (ContT)
+import Control.Monad.Trans.State (StateT(..))
+import Control.Monad.Trans.Reader (ReaderT(..), mapReaderT)
+import qualified Control.Monad.Trans.State.Strict as Strict (StateT(..))
 
-import Data.Vector
+--------------------------------------------------------------------------------
+-- Type-level shenanigans
+--------------------------------------------------------------------------------
+infixr 5 :-
+data Vect xs where
+  One  :: x -> Vect '[x]
+  (:-) :: x -> Vect xs -> Vect (x ': xs)
+
+infixr 5 :*
+data AppVect f xs where
+  OneA :: f x -> AppVect f '[x]
+  (:*) :: f x -> AppVect f xs -> AppVect f (x ': xs)
 
 --------------------------------------------------------------------------------
 -- Standard classes
 --------------------------------------------------------------------------------
 
+-- | This is the same class as 'Prelude.Functor' from the Prelude. Most of the
+-- functions here are simply rewritten versions of those, with one difference:
+-- types can indicate /which/ types they can contain. This allows
+-- 'Data.Set.Set' to be made into a monad, as well as some other exotic types.
+-- (but, to be fair, 'Data.Set.Set' is kind of the poster child for this
+-- technique).
+--
+-- The way that types indicate what they can contain is with the 'Suitable'
+-- associated type.
+--
+-- The default implementation is for types which conform to the Prelude's
+-- 'Prelude.Functor'. In order to make a standard 'Prelude.Functor' conform
+-- is by indicating that it has no constraints. For instance, for @[]@:
+--
+-- @instance 'Functor' [] where type 'Suitable' [] a = ()@
 class Functor f  where
+    -- | Indicate which types can be contained by 'f'. For instance,
+    -- 'Data.Set.Set' conforms like so:
+    --
+    -- @instance 'Functor' 'Set' where
+    --    type 'Suitable' 'Set' a = 'Ord' a
+    --    'fmap' = 'Set.map'@
     type Suitable f a :: Constraint
     fmap
         :: Suitable f b
@@ -95,9 +131,48 @@ class Functor f =>
         => f a -> f b -> f b
     (*>) = liftA2 (flip const)
     {-# INLINE (*>) #-}
+    -- | The shenanigans introduced by this function are to account for the fact
+    -- that you (I don't think) can write an arbitrary lift function on
+    -- non-monadic applicatives that have constrained types. For instance, if
+    -- the only present functions are:
+    --
+    -- @'pure'  :: 'Suitable' f a => a -> f b
+    --'fmap'  :: 'Suitable' f b => (a -> b) -> f a -> f b
+    --('<*>') :: 'Suitable' f b => f (a -> b) -> f a -> f b@
+    --
+    -- I can't see a way to define:
+    --
+    -- @'liftA2' :: 'Suitable' f c => (a -> b -> c) -> f a -> f b -> f c@
+    --
+    -- Of course, if:
+    --
+    -- @('>>=') :: 'Suitable' f b => f a -> (a -> f b) -> f b@
+    --
+    -- is available, 'liftA2' could be defined as:
+    --
+    -- @'liftA2' f xs ys = do
+    --    x <- xs
+    --    y <- ys
+    --    'pure' (f x)@
+    --
+    -- But now we can't define the 'liftA' functions for things which are
+    -- 'Applicative' but not 'Monad' (square matrices,
+    -- 'Control.Applicative.ZipList's, etc). Also, some types have a more
+    -- efficient @('<*>')@ than @('>>=')@ (see, for instance, the
+    -- <https://simonmar.github.io/posts/2015-10-20-Fun-With-Haxl-1.html Haxl>
+    -- monad).
+    --
+    -- The one missing piece is @-XApplicativeDo@: I can't figure out a way
+    -- to get do-notation to desugar to using the 'liftA' functions, rather
+    -- than @('<*>')@.
+    --
+    -- It would also be preferable to avoid the two intermediate structures
+    -- ('Vect', 'AppVect', etc). Hopefully GHC will optimize them away, but
+    -- it seems unlikely.
     liftA
         :: Suitable f b
         => (Vect xs -> b) -> AppVect f xs -> f b
+
     liftA2
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
@@ -136,6 +211,76 @@ class Functor f =>
             (\(v :- w :- x :- y :- One z) ->
                   f v w x y z)
             (vs :* ws :* xs :* ys :* OneA zs)
+
+    liftA6
+        :: Suitable f h
+        => (a -> b -> c -> d -> e -> g -> h)
+        -> f a
+        -> f b
+        -> f c
+        -> f d
+        -> f e
+        -> f g
+        -> f h
+    liftA6 f us vs ws xs ys zs =
+        liftA
+            (\(u :- v :- w :- x :- y :- One z) ->
+                  f u v w x y z)
+            (us :* vs :* ws :* xs :* ys :* OneA zs)
+
+    liftA7
+        :: Suitable f i
+        => (a -> b -> c -> d -> e -> g -> h -> i)
+        -> f a
+        -> f b
+        -> f c
+        -> f d
+        -> f e
+        -> f g
+        -> f h
+        -> f i
+    liftA7 f ts us vs ws xs ys zs =
+        liftA
+            (\(t :- u :- v :- w :- x :- y :- One z) ->
+                  f t u v w x y z)
+            (ts :* us :* vs :* ws :* xs :* ys :* OneA zs)
+
+    liftA8
+        :: Suitable f j
+        => (a -> b -> c -> d -> e -> g -> h -> i -> j)
+        -> f a
+        -> f b
+        -> f c
+        -> f d
+        -> f e
+        -> f g
+        -> f h
+        -> f i
+        -> f j
+    liftA8 f ss ts us vs ws xs ys zs =
+        liftA
+            (\(s :- t :- u :- v :- w :- x :- y :- One z) ->
+                  f s t u v w x y z)
+            (ss :* ts :* us :* vs :* ws :* xs :* ys :* OneA zs)
+
+    liftA9
+        :: Suitable f k
+        => (a -> b -> c -> d -> e -> g -> h -> i -> j -> k)
+        -> f a
+        -> f b
+        -> f c
+        -> f d
+        -> f e
+        -> f g
+        -> f h
+        -> f i
+        -> f j
+        -> f k
+    liftA9 f rs ss ts us vs ws xs ys zs =
+        liftA
+            (\(r :- s :- t :- u :- v :- w :- x :- y :- One z) ->
+                  f r s t u v w x y z)
+            (rs :* ss :* ts :* us :* vs :* ws :* xs :* ys :* OneA zs)
 
 liftA' :: (Prelude.Applicative f) => (Vect xs -> b) -> (AppVect f xs -> f b)
 liftA' f (OneA xs) = Prelude.fmap (f . One) xs
@@ -228,7 +373,7 @@ infixl 4 <$
 
 infixl 4 <*
 (<*) :: (Applicative f, Suitable f a) => f a -> f b -> f a
-(<*) = flip (*>)
+(<*) = liftA2 const
 
 -- | One or more.
 some :: (Alternative f, Suitable f [a]) => f a -> f [a]
@@ -269,7 +414,7 @@ instance Functor [] where
     type Suitable [] a = ()
 instance Applicative [] where liftA = liftA'
 instance Alternative []
-instance Monad       []
+instance Monad []
 instance Traversable [] where
   traverse f = foldr (liftA2 (:) . f) (pure [])
 
@@ -346,9 +491,60 @@ instance Applicative ((->) a) where liftA = liftA'
 instance Monad ((->) a)
 
 instance Functor (ContT r m) where
-  type Suitable (ContT r m) a = ()
+    type Suitable (ContT r m) a = ()
 instance Applicative (ContT r m) where liftA = liftA'
 instance Monad (ContT r m)
+
+instance Functor Control.Applicative.ZipList where
+    type Suitable Control.Applicative.ZipList a = ()
+instance Applicative Control.Applicative.ZipList where
+    liftA = liftA'
+
+
+instance Functor m => Functor (Strict.StateT s m) where
+    type Suitable (Strict.StateT s m) a = Suitable m (a, s)
+    fmap f m = Strict.StateT $ \ s ->
+        (\ (!a, !s') -> (f a, s')) <$> Strict.runStateT m s
+    {-# INLINE fmap #-}
+
+instance (Monad m) =>
+         Applicative (Strict.StateT s m) where
+    pure a =
+        Strict.StateT $
+        \(!s) ->
+             pure (a, s)
+    {-# INLINE pure #-}
+    Strict.StateT mf <*> Strict.StateT mx =
+        Strict.StateT $
+        \s -> do
+            (f,s') <- mf s
+            (x,s'') <- mx s'
+            pure (f x, s'')
+    Strict.StateT xs *> Strict.StateT ys =
+        Strict.StateT $
+        \(!s) -> do
+            (_,s') <- xs s
+            ys s'
+    liftA f (OneA xs) = fmap (f . One) xs
+    liftA f (x :* xs) = Strict.StateT $ \s -> do
+      (x',s') <- Strict.runStateT x s
+      Strict.runStateT (liftA (f . (x':-)) xs) s'
+
+instance (Monad m, Alternative m) => Alternative (Strict.StateT s m) where
+    empty = Strict.StateT (const empty)
+    {-# INLINE empty #-}
+    Strict.StateT m <|> Strict.StateT n = Strict.StateT $ \ s -> m s <|> n s
+    {-# INLINE (<|>) #-}
+
+instance (Monad m) => Monad (Strict.StateT s m) where
+    m >>= k = Strict.StateT $ \ s -> do
+        (a, s') <- Strict.runStateT m s
+        Strict.runStateT (k a) s'
+    {-# INLINE (>>=) #-}
+    join (Strict.StateT xs) = Strict.StateT $ \s -> do
+      ~(x,s') <- xs s
+      Strict.runStateT x s'
+    {-# INLINE join #-}
 
 instance Functor m => Functor (StateT s m) where
     type Suitable (StateT s m) a = Suitable m (a, s)
@@ -427,3 +623,4 @@ instance (Monad m) => Monad (ReaderT r m) where
 liftReaderT :: m a -> ReaderT r m a
 liftReaderT m = ReaderT (const m)
 {-# INLINE liftReaderT #-}
+
