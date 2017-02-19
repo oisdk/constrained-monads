@@ -637,7 +637,7 @@ liftReaderT m = ReaderT (const m)
 {-# INLINE liftReaderT #-}
 
 instance Functor m => Functor (MaybeT m) where
-  type Suitable (MaybeT m) a = Suitable m (Maybe a)
+  type Suitable (MaybeT m) a = (Suitable m (Maybe a), Suitable m a)
   fmap f (MaybeT xs) = MaybeT ((fmap.fmap) f xs)
 
 instance Monad m => Applicative (MaybeT m) where
@@ -692,6 +692,9 @@ instance Applicative m =>
     liftA f =
         (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
             (liftA f)
-instance Monad m => Monad (IdentityT m) where
-  (>>=) = (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b) (>>=)
-  join (IdentityT xs) = IdentityT (xs >>= runIdentityT)
+instance Monad m =>
+         Monad (IdentityT m) where
+    (>>=) =
+        (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
+            (>>=)
+    join (IdentityT xs) = IdentityT (xs >>= runIdentityT)
