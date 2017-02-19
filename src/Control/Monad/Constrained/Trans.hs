@@ -16,40 +16,40 @@ import Control.Monad.Trans.Except (ExceptT(..))
 
 
 class MonadTrans t where
-  type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) :: Constraint
-  lift :: (Suitable (t m) a, Monad m, SuitableLift t m) => m a -> t m a
+  type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) (a :: *) :: Constraint
+  lift :: (Monad m, SuitableLift t m a) => m a -> t m a
 
 instance MonadTrans (ContT r) where
-    type SuitableLift (ContT r) m = Suitable m r
+    type SuitableLift (ContT r) m a = Suitable m r
     lift m = ContT (m >>=)
     {-# INLINE lift #-}
 
 instance MonadTrans (ReaderT r) where
-    type SuitableLift (ReaderT r) m = ()
+    type SuitableLift (ReaderT r) m a = ()
     lift m = ReaderT (const m)
     {-# INLINE lift #-}
 
 instance MonadTrans (Strict.StateT r) where
-    type SuitableLift (Strict.StateT r) m = ()
+    type SuitableLift (Strict.StateT r) m a = Suitable m (a,r)
     lift m = Strict.StateT (\s -> fmap (flip (,) s) m)
     {-# INLINE lift #-}
 
 instance MonadTrans (Lazy.StateT r) where
-    type SuitableLift (Lazy.StateT r) m = ()
+    type SuitableLift (Lazy.StateT r) m a = Suitable m (a,r)
     lift m = Lazy.StateT (\s -> fmap (flip (,) s) m)
     {-# INLINE lift #-}
 
 instance MonadTrans IdentityT where
-    type SuitableLift IdentityT m = ()
+    type SuitableLift IdentityT m a = ()
     lift = IdentityT
     {-# INLINE lift #-}
 
 instance MonadTrans MaybeT where
-    type SuitableLift MaybeT m = ()
+    type SuitableLift MaybeT m a = Suitable m (Maybe a)
     lift = MaybeT . fmap Just
     {-# INLINE lift #-}
 
 instance MonadTrans (ExceptT e) where
-    type SuitableLift (ExceptT e) m = ()
+    type SuitableLift (ExceptT e) m a = Suitable m (Either e a)
     lift = ExceptT . fmap Right
     {-# INLINE lift #-}

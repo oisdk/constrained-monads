@@ -18,6 +18,7 @@ import qualified Control.Monad.Trans.State.Strict as State.Strict
 
 import qualified Control.Monad.Trans.Maybe as Maybe
 import qualified Control.Monad.Trans.Cont as Cont
+import qualified Control.Monad.Trans.Identity as Identity
 
 import Control.Monad.Constrained.Trans
 
@@ -52,10 +53,15 @@ instance Monad m => MonadState s (State.Lazy.StateT s m) where
   state f = State.Lazy.StateT (pure . f)
 
 instance (MonadState s m, Suitable m r) => MonadState s (Cont.ContT r m) where
-    type StateSuitable (Cont.ContT r m) s a = (Suitable m s, Suitable m r, StateSuitable m s a)
+    type StateSuitable (Cont.ContT r m) s a = StateSuitable m s a
     state = lift . state
 
 instance MonadState s m =>
          MonadState s (Maybe.MaybeT m) where
-    type StateSuitable (Maybe.MaybeT m) s a = (Suitable m (Maybe a), Suitable m a, StateSuitable m s a)
+    type StateSuitable (Maybe.MaybeT m) s a = (Suitable m (Maybe a), StateSuitable m s a)
+    state = lift . state
+
+instance MonadState s m =>
+         MonadState s (Identity.IdentityT m) where
+    type StateSuitable (Identity.IdentityT m) s a = (StateSuitable m s a)
     state = lift . state
