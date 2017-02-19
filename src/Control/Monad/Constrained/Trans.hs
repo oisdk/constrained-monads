@@ -16,7 +16,6 @@ import           Control.Monad.Trans.State.Strict as Strict (StateT (..))
 
 import           GHC.Exts
 
-
 class MonadTrans t  where
     type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) (a :: *) :: Constraint
     lift
