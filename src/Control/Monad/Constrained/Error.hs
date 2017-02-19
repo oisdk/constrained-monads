@@ -22,18 +22,18 @@ import qualified Control.Monad.Trans.State.Strict as State.Strict
 
 class Monad m =>
       MonadError e m  | m -> e where
-    type SuitableError m e a :: Constraint
-    throwError :: SuitableError m e a => e -> m a
-    catchError :: SuitableError m e a => m a -> (e -> m a) -> m a
+    type SuitableError m a :: Constraint
+    throwError :: SuitableError m a => e -> m a
+    catchError :: SuitableError m a => m a -> (e -> m a) -> m a
 
 instance MonadError e (Either e) where
-    type SuitableError (Either e) e a = ()
+    type SuitableError (Either e) a = ()
     throwError = Left
     catchError (Left x) f = f x
     catchError r _ = r
 
 instance Monad m => MonadError e (Except.ExceptT e m) where
-    type SuitableError (Except.ExceptT e m) e a = Suitable m (Either e a)
+    type SuitableError (Except.ExceptT e m) a = Suitable m (Either e a)
     throwError = Except.ExceptT . pure . Left
     catchError = catchE
 
@@ -51,33 +51,33 @@ catchE m h =
 {-# INLINE catchE #-}
 
 instance MonadError e m => MonadError e (Identity.IdentityT m) where
-    type SuitableError (Identity.IdentityT m) e a = SuitableError m e a
+    type SuitableError (Identity.IdentityT m) a = SuitableError m a
     throwError = lift . throwError
     catchError = Identity.liftCatch catchError
 
 instance MonadError e m =>
          MonadError e (Maybe.MaybeT m) where
-    type SuitableError (Maybe.MaybeT m) e a
-        = (SuitableError m e a
-          ,SuitableError m e (Maybe a)
+    type SuitableError (Maybe.MaybeT m) a
+        = (SuitableError m a
+          ,SuitableError m (Maybe a)
           ,Suitable m (Maybe a))
     throwError = lift . throwError
     catchError = Maybe.liftCatch catchError
 
 instance MonadError e m =>
          MonadError e (Reader.ReaderT r m) where
-    type SuitableError (Reader.ReaderT r m) e a = SuitableError m e a
+    type SuitableError (Reader.ReaderT r m) a = SuitableError m a
     throwError = lift . throwError
     catchError = Reader.liftCatch catchError
 
 instance MonadError e m => MonadError e (State.Lazy.StateT s m) where
-    type SuitableError (State.Lazy.StateT s m) e a
-        = (Suitable m (a,s), SuitableError m e (a,s), SuitableError m e a)
+    type SuitableError (State.Lazy.StateT s m) a
+        = (Suitable m (a,s), SuitableError m (a,s), SuitableError m a)
     throwError = lift . throwError
     catchError = State.Lazy.liftCatch catchError
 
 instance MonadError e m => MonadError e (State.Strict.StateT s m) where
-    type SuitableError (State.Strict.StateT s m) e a
-        = (Suitable m (a,s), SuitableError m e (a,s), SuitableError m e a)
+    type SuitableError (State.Strict.StateT s m) a
+        = (Suitable m (a,s), SuitableError m (a,s), SuitableError m a)
     throwError = lift . throwError
     catchError = State.Strict.liftCatch catchError
