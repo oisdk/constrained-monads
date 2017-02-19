@@ -77,7 +77,8 @@ instance (MonadState s m, Suitable m r) => MonadState s (Cont.ContT r m) where
 
 instance MonadState s m =>
          MonadState s (Maybe.MaybeT m) where
-    type StateSuitable (Maybe.MaybeT m) s a = (Suitable m (Maybe a), StateSuitable m s a)
+    type StateSuitable (Maybe.MaybeT m) s a
+        = (Suitable m (Maybe a), StateSuitable m s a)
     state = lift . state
 
 instance MonadState s m =>
@@ -92,5 +93,6 @@ instance MonadState s m =>
 
 instance MonadState s m =>
          MonadState s (Except.ExceptT e m) where
-    type StateSuitable (Except.ExceptT e m) s a = (Suitable m (Either e a), StateSuitable m s a)
+    type StateSuitable (Except.ExceptT e m) s a
+        = (Suitable m (Either e a), StateSuitable m s a)
     state = lift . state
