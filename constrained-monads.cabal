@@ -15,6 +15,10 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Constrained
+                     , Control.Monad.Constrained.Trans
+                     , Control.Monad.Constrained.State
+                     , Control.Monad.Constrained.Reader
+                     , Control.Monad.Constrained.Error
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5
                      , transformers >= 0.5
