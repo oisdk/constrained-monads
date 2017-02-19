@@ -1,13 +1,13 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE RebindableSyntax     #-}
-{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE BangPatterns         #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE RebindableSyntax     #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | A module for constrained monads (set, etc)
 module Control.Monad.Constrained
@@ -33,8 +33,6 @@ module Control.Monad.Constrained
   ,traverse_
   ,replicateM
   ,void
-  ,(<$)
-  ,(<*)
   ,some
   ,many
   ,
@@ -48,29 +46,33 @@ module Control.Monad.Constrained
 
 import           GHC.Exts
 
-import Prelude as RestPrelude
-       hiding (Applicative(..), Functor(..), Monad(..), (<$>),
-               Traversable(..), (=<<))
+import           Prelude                          as RestPrelude hiding (Applicative (..),
+                                                                  Functor (..),
+                                                                  Monad (..),
+                                                                  Traversable (..),
+                                                                  (<$>), (=<<))
 
-import qualified Prelude
 import qualified Control.Applicative
 import qualified Control.Monad
+import qualified Prelude
 
-import Data.Functor.Identity (Identity(..))
+import           Data.Functor.Identity            (Identity (..))
 
-import Data.Map.Strict (Map)
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.IntMap.Strict (IntMap)
-import Data.Sequence (Seq)
+import           Data.IntMap.Strict               (IntMap)
+import           Data.Map.Strict                  (Map)
+import           Data.Sequence                    (Seq)
+import           Data.Set                         (Set)
+import qualified Data.Set                         as Set
 
-import Control.Monad.Trans.Cont (ContT)
-import Control.Monad.Trans.State (StateT(..))
-import Control.Monad.Trans.Reader (ReaderT(..), mapReaderT)
-import qualified Control.Monad.Trans.State.Strict as Strict (StateT(..))
-import Control.Monad.Trans.Maybe (MaybeT(..))
-import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Control.Monad.Trans.Identity (IdentityT(..))
+import           Control.Monad.Trans.Cont         (ContT)
+import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
+import           Control.Monad.Trans.Identity     (IdentityT (..))
+import           Control.Monad.Trans.Maybe        (MaybeT (..))
+import           Control.Monad.Trans.Reader       (ReaderT (..), mapReaderT)
+import           Control.Monad.Trans.State        (StateT (..))
+import qualified Control.Monad.Trans.State.Strict as Strict (StateT (..))
+
+import           Control.Arrow (first)
 
 --------------------------------------------------------------------------------
 -- Type-level shenanigans
@@ -123,6 +125,12 @@ class Functor f  where
     default fmap :: Prelude.Functor f => (a -> b) -> f a -> f b
     fmap = Prelude.fmap
 
+    infixl 4 <$
+    (<$) :: Suitable f a => a -> f b -> f a
+    default (<$) :: Prelude.Functor f => a -> f b -> f a
+    (<$) = (Prelude.<$)
+
+
 class Functor f =>
       Applicative f  where
     pure
@@ -135,14 +143,25 @@ class Functor f =>
         => f (a -> b) -> f a -> f b
     default pure :: Prelude.Applicative f => a -> f a
     pure = Prelude.pure
+
     default (<*>) :: Prelude.Applicative f => f (a -> b) -> f a -> f b
     (<*>) = (Prelude.<*>)
+
     infixl 4 *>
     (*>)
         :: Suitable f b
         => f a -> f b -> f b
-    (*>) = liftA2 (flip const)
+    default (*>) :: Prelude.Applicative f => f a -> f b -> f b
+    (*>) = (Prelude.*>)
     {-# INLINE (*>) #-}
+
+    infixl 4 <*
+    (<*)
+        :: Suitable f a
+        => f a -> f b -> f a
+    default (<*) :: Prelude.Applicative f => f a -> f b -> f a
+    (<*) = (Prelude.<*)
+    {-# INLINE (<*) #-}
     -- | The shenanigans introduced by this function are to account for the fact
     -- that you (I don't think) can write an arbitrary lift function on
     -- non-monadic applicatives that have constrained types. For instance, if
@@ -377,15 +396,7 @@ replicateM cnt0 f =
         | otherwise = liftA2 (:) f (loop (cnt - 1))
 
 void :: (Functor f, Suitable f ()) => f a -> f ()
-void = fmap (const ())
-
-infixl 4 <$
-(<$) :: (Functor f, Suitable f a) => a -> f b -> f a
-(<$) = fmap . const
-
-infixl 4 <*
-(<*) :: (Applicative f, Suitable f a) => f a -> f b -> f a
-(<*) = liftA2 const
+void = (<$) ()
 
 -- | One or more.
 some :: (Alternative f, Suitable f [a]) => f a -> f [a]
@@ -462,11 +473,13 @@ instance Traversable (Either a) where
 instance Functor Set where
     type Suitable Set a = Ord a
     fmap = Set.map
+    x <$ xs = if null xs then Set.empty else Set.singleton x
 
 instance Applicative Set where
     pure = Set.singleton
     fs <*> xs = foldMap (`Set.map` xs) fs
-    _ *> x = x
+    xs *> ys = if null xs then Set.empty else ys
+    xs <* ys = if null ys then Set.empty else xs
     liftA f (OneA xs) = fmap (f . One) xs
     liftA f (x :* xs) = x >>= \y -> liftA (f . (y:-)) xs
 
@@ -518,8 +531,9 @@ instance Functor m => Functor (Strict.StateT s m) where
     fmap f m = Strict.StateT $ \ s ->
         (\ (!a, !s') -> (f a, s')) <$> Strict.runStateT m s
     {-# INLINE fmap #-}
+    x <$ xs = Strict.StateT ((fmap.first) (const x) . Strict.runStateT xs)
 
-instance (Monad m) =>
+instance Monad m =>
          Applicative (Strict.StateT s m) where
     pure a =
         Strict.StateT $
@@ -537,6 +551,11 @@ instance (Monad m) =>
         \(!s) -> do
             (_,s') <- xs s
             ys s'
+    Strict.StateT xs <* Strict.StateT ys =
+        Strict.StateT $
+        \(!s) -> do
+            (_,s') <- ys s
+            xs s'
     liftA f (OneA xs) = fmap (f . One) xs
     liftA f (x :* xs) = Strict.StateT $ \s -> do
       (x',s') <- Strict.runStateT x s
@@ -563,6 +582,7 @@ instance Functor m => Functor (StateT s m) where
     fmap f m = StateT $ \ s ->
         (\ ~(a, s') -> (f a, s')) <$> runStateT m s
     {-# INLINE fmap #-}
+    x <$ StateT xs = StateT ((fmap.first) (const x) . xs)
 
 instance (Monad m) =>
          Applicative (StateT s m) where
@@ -582,6 +602,11 @@ instance (Monad m) =>
         \s -> do
             ~(_,s') <- xs s
             ys s'
+    StateT xs <* StateT ys =
+        StateT $
+        \s -> do
+            ~(_,s') <- ys s
+            xs s'
     liftA f (OneA xs) = fmap (f . One) xs
     liftA f (x :* xs) = StateT $ \s -> do
       ~(x',s') <- runStateT x s
@@ -605,8 +630,9 @@ instance (Monad m) => Monad (StateT s m) where
 
 instance (Functor m) => Functor (ReaderT r m) where
     type Suitable (ReaderT r m) a = Suitable m a
-    fmap f  = mapReaderT (fmap f)
+    fmap f = mapReaderT (fmap f)
     {-# INLINE fmap #-}
+    x <$ ReaderT xs = ReaderT (\r -> x <$ xs r)
 
 instance (Applicative m) => Applicative (ReaderT r m) where
     pure = liftReaderT . pure
@@ -617,7 +643,8 @@ instance (Applicative m) => Applicative (ReaderT r m) where
       tr :: Functor m => r -> AppVect (ReaderT r m) xs -> AppVect m xs
       tr r (OneA xs) = OneA (runReaderT xs r)
       tr r (x :* xs) = runReaderT x r :* tr r xs
-    _ *> x = x
+    ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
+    ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
 instance (Alternative m) => Alternative (ReaderT r m) where
     empty   = liftReaderT empty
@@ -639,6 +666,7 @@ liftReaderT m = ReaderT (const m)
 instance Functor m => Functor (MaybeT m) where
   type Suitable (MaybeT m) a = (Suitable m (Maybe a), Suitable m a)
   fmap f (MaybeT xs) = MaybeT ((fmap.fmap) f xs)
+  x <$ (MaybeT xs) = MaybeT (fmap (x<$) xs)
 
 instance Monad m => Applicative (MaybeT m) where
   pure x = MaybeT (pure (Just x))
@@ -647,26 +675,38 @@ instance Monad m => Applicative (MaybeT m) where
   liftA f (x :* xs) = MaybeT $ runMaybeT x >>= \case
       Nothing -> pure Nothing
       Just x' -> runMaybeT (liftA (f . (x':-)) xs)
+  MaybeT xs *> MaybeT ys = MaybeT (xs *> ys)
+  MaybeT xs <* MaybeT ys = MaybeT (xs <* ys)
 
 instance Monad m => Monad (MaybeT m) where
   MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
   join = MaybeT . (maybe (pure Nothing) runMaybeT <=< runMaybeT)
 
-instance Monad m => Alternative (MaybeT m) where
-  empty = MaybeT (pure Nothing)
-  MaybeT x <|> MaybeT y = MaybeT (x >>= maybe y (pure . Just))
+instance Monad m =>
+         Alternative (MaybeT m) where
+    empty = MaybeT (pure Nothing)
+    MaybeT x <|> MaybeT y = MaybeT (x >>= maybe y (pure . Just))
 
-instance Functor m => Functor (ExceptT e m) where
-  type Suitable (ExceptT e m) a = Suitable m (Either e a)
-  fmap f (ExceptT xs) = ExceptT ((fmap.fmap) f xs)
+instance Functor m =>
+         Functor (ExceptT e m) where
+    type Suitable (ExceptT e m) a = Suitable m (Either e a)
+    fmap f (ExceptT xs) = ExceptT ((fmap . fmap) f xs)
+    x <$ (ExceptT xs) = ExceptT (fmap (x <$) xs)
 
-instance Monad m => Applicative (ExceptT e m) where
-  pure x = ExceptT (pure (Right x))
-  ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
-  liftA f (OneA xs) = fmap (f . One) xs
-  liftA f (ExceptT x :* xs) = ExceptT $ x >>= \case
-      Left x' -> pure (Left x')
-      Right x' -> runExceptT (liftA (f . (x':-)) xs)
+instance Monad m =>
+         Applicative (ExceptT e m) where
+    pure x = ExceptT (pure (Right x))
+    ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
+    liftA f (OneA xs) = fmap (f . One) xs
+    liftA f (ExceptT x :* xs) =
+        ExceptT $
+        x >>=
+        \case
+            Left x' -> pure (Left x')
+            Right x' -> runExceptT (liftA (f . (x' :-)) xs)
+    ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
+    ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
+
 
 instance Monad m => Monad (ExceptT e m) where
   ExceptT xs >>= f = ExceptT (xs >>= either (pure . Left) (runExceptT . f))
@@ -682,6 +722,9 @@ instance Functor m =>
     fmap =
         (coerce :: ((a -> b) -> f a -> f b) -> (a -> b) -> IdentityT f a -> IdentityT f b)
             fmap
+    (<$) =
+        (coerce :: (a -> f b -> f a) -> a -> IdentityT f b -> IdentityT f a)
+            (<$)
 
 instance Applicative m =>
          Applicative (IdentityT m) where
@@ -692,6 +735,9 @@ instance Applicative m =>
     liftA f =
         (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
             (liftA f)
+    IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
+    IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
+
 instance Monad m =>
          Monad (IdentityT m) where
     (>>=) =
