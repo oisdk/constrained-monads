@@ -1,26 +1,28 @@
-{-# LANGUAGE RebindableSyntax       #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ConstraintKinds        #-}
 {-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE RebindableSyntax       #-}
+{-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ConstraintKinds  #-}
 
 module Control.Monad.Constrained.State where
 
-import GHC.Exts
+import           GHC.Exts
 
-import Control.Monad.Constrained
+import           Control.Monad.Constrained
 
-import qualified Control.Monad.Trans.State.Lazy as State.Lazy
+import qualified Control.Monad.Trans.State.Lazy   as State.Lazy
 import qualified Control.Monad.Trans.State.Strict as State.Strict
 
-import qualified Control.Monad.Trans.Maybe as Maybe
-import qualified Control.Monad.Trans.Cont as Cont
-import qualified Control.Monad.Trans.Identity as Identity
+import qualified Control.Monad.Trans.Cont         as Cont
+import qualified Control.Monad.Trans.Identity     as Identity
+import qualified Control.Monad.Trans.Maybe        as Maybe
+import qualified Control.Monad.Trans.Reader       as Reader
+import qualified Control.Monad.Trans.Except       as Except
 
-import Control.Monad.Constrained.Trans
+import           Control.Monad.Constrained.Trans
 
 class Monad m =>
       MonadState s m  | m -> s where
@@ -44,6 +46,23 @@ class Monad m =>
 gets :: (StateSuitable m s s, MonadState s m, Suitable m b) => (s -> b) -> m b
 gets f = fmap f get
 
+modify
+    :: (StateSuitable m s (), StateSuitable m s s, MonadState s m)
+    => (s -> s) -> m ()
+modify f =
+    state
+        (\s ->
+              ((), f s))
+
+modify'
+    :: (StateSuitable m s (), StateSuitable m s s, MonadState s m)
+    => (s -> s) -> m ()
+modify' f =
+    state
+        (\s ->
+              let s' = f s
+              in s' `seq` ((), s'))
+
 instance Monad m => MonadState s (State.Strict.StateT s m) where
   type StateSuitable (State.Strict.StateT s m) s a = Suitable m (a, s)
   state f = State.Strict.StateT (pure . f)
@@ -64,4 +83,14 @@ instance MonadState s m =>
 instance MonadState s m =>
          MonadState s (Identity.IdentityT m) where
     type StateSuitable (Identity.IdentityT m) s a = (StateSuitable m s a)
+    state = lift . state
+
+instance MonadState s m =>
+         MonadState s (Reader.ReaderT r m) where
+    type StateSuitable (Reader.ReaderT r m) s a = StateSuitable m s a
+    state = lift . state
+
+instance MonadState s m =>
+         MonadState s (Except.ExceptT e m) where
+    type StateSuitable (Except.ExceptT e m) s a = (Suitable m (Either e a), StateSuitable m s a)
     state = lift . state

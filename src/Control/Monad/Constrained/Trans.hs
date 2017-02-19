@@ -5,19 +5,23 @@
 module Control.Monad.Constrained.Trans where
 
 import           Control.Monad.Constrained
+
+import           Control.Monad.Trans.Cont         (ContT (..))
+import           Control.Monad.Trans.Except       (ExceptT (..))
+import           Control.Monad.Trans.Identity     (IdentityT (..))
+import           Control.Monad.Trans.Maybe        (MaybeT (..))
+import           Control.Monad.Trans.Reader       (ReaderT (..))
+import           Control.Monad.Trans.State.Lazy   as Lazy (StateT (..))
+import           Control.Monad.Trans.State.Strict as Strict (StateT (..))
+
 import           GHC.Exts
-import Control.Monad.Trans.Cont (ContT(..))
-import Control.Monad.Trans.Reader (ReaderT(..))
-import Control.Monad.Trans.State.Strict as Strict (StateT(..))
-import Control.Monad.Trans.State.Lazy as Lazy (StateT(..))
-import Control.Monad.Trans.Identity (IdentityT(..))
-import Control.Monad.Trans.Maybe (MaybeT(..))
-import Control.Monad.Trans.Except (ExceptT(..))
 
 
-class MonadTrans t where
-  type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) (a :: *) :: Constraint
-  lift :: (Monad m, SuitableLift t m a) => m a -> t m a
+class MonadTrans t  where
+    type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) (a :: *) :: Constraint
+    lift
+        :: (Monad m, SuitableLift t m a)
+        => m a -> t m a
 
 instance MonadTrans (ContT r) where
     type SuitableLift (ContT r) m a = Suitable m r
