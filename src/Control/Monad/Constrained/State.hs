@@ -12,6 +12,7 @@ module Control.Monad.Constrained.State where
 import           GHC.Exts
 
 import           Control.Monad.Constrained
+import           Control.Monad.Constrained.Trans
 
 import qualified Control.Monad.Trans.State.Lazy   as State.Lazy
 import qualified Control.Monad.Trans.State.Strict as State.Strict
@@ -22,7 +23,6 @@ import qualified Control.Monad.Trans.Maybe        as Maybe
 import qualified Control.Monad.Trans.Reader       as Reader
 import qualified Control.Monad.Trans.Except       as Except
 
-import           Control.Monad.Constrained.Trans
 
 class Monad m =>
       MonadState s m  | m -> s where
