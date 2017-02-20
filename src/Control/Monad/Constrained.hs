@@ -108,10 +108,26 @@ data AppVect f xs where
 -- associated type.
 --
 -- The default implementation is for types which conform to the Prelude's
--- 'Prelude.Functor'. In order to make a standard 'Prelude.Functor' conform
+-- 'Prelude.Functor'. The way to make a standard 'Prelude.Functor' conform
 -- is by indicating that it has no constraints. For instance, for @[]@:
 --
 -- @instance 'Functor' [] where type 'Suitable' [] a = ()@
+--
+-- Monomorphic types can also conform, using GADT aliases. For instance,
+-- if you create an alias for 'Data.IntSet.IntSet' of kind @* -> *@:
+--
+-- @data IntSet a where
+--  IntSet :: IntSet.'Data.IntSet.IntSet' -> IntSet 'Int'@
+--
+-- It can be made to conform to 'Functor' like so:
+--
+-- @instance 'Functor' IntSet where
+--  type 'Suitable' IntSet a = a ~ 'Int'
+--  'fmap' f (IntSet xs) = IntSet (IntSet.'Data.IntSet.map' f xs)
+--  x '<$' xs = if 'null' xs then 'empty' else 'pure' x@
+--
+-- It can also be made conform to 'Foldable', etc. This type is provided in
+-- @Control.Monad.Constrained.IntSet@.
 class Functor f  where
     -- | Indicate which types can be contained by 'f'. For instance,
     -- 'Data.Set.Set' conforms like so:
@@ -173,7 +189,7 @@ class Functor f =>
     (<*) = (Prelude.<*)
     {-# INLINE (<*) #-}
     -- | The shenanigans introduced by this function are to account for the fact
-    -- that you (I don't think) can write an arbitrary lift function on
+    -- that you can't (I don't think) write an arbitrary lift function on
     -- non-monadic applicatives that have constrained types. For instance, if
     -- the only present functions are:
     --
@@ -333,17 +349,11 @@ liftA' f (x :* xs) =  ((f .) . (:-)) Prelude.<$> x Prelude.<*> liftA' id xs
 
 class Applicative f =>
       Monad f  where
-    join
-        :: Suitable f a
-        => f (f a) -> f a
-    {-# INLINE join #-}
     infixl 1 >>=
     (>>=)
         :: Suitable f b
         => f a -> (a -> f b) -> f b
     {-# INLINE (>>=) #-}
-    default join :: Prelude.Monad f => f (f a) -> f a
-    join = Control.Monad.join
     default (>>=) :: Prelude.Monad f => f a -> (a -> f b) -> f b
     (>>=) = (Prelude.>>=)
 
@@ -536,7 +546,6 @@ instance Applicative Set where
     liftA f (x :* xs) = x >>= \y -> liftA (f . (y:-)) xs
 
 instance Monad Set where
-    join = foldMap id
     (>>=) = flip foldMap
 
 instance Alternative Set where
@@ -624,10 +633,6 @@ instance (Monad m) => Monad (Strict.StateT s m) where
         (a, s') <- Strict.runStateT m s
         Strict.runStateT (k a) s'
     {-# INLINE (>>=) #-}
-    join (Strict.StateT xs) = Strict.StateT $ \s -> do
-      (x,s') <- xs s
-      Strict.runStateT x s'
-    {-# INLINE join #-}
 
 instance Functor m => Functor (StateT s m) where
     type Suitable (StateT s m) a = Suitable m (a, s)
@@ -675,10 +680,6 @@ instance (Monad m) => Monad (StateT s m) where
         ~(a, s') <- runStateT m s
         runStateT (k a) s'
     {-# INLINE (>>=) #-}
-    join (StateT xs) = StateT $ \s -> do
-      ~(x,s') <- xs s
-      runStateT x s'
-    {-# INLINE join #-}
 
 instance (Functor m) => Functor (ReaderT r m) where
     type Suitable (ReaderT r m) a = Suitable m a
@@ -709,7 +710,6 @@ instance (Monad m) => Monad (ReaderT r m) where
         a <- runReaderT m r
         runReaderT (k a) r
     {-# INLINE (>>=) #-}
-    join (ReaderT x) = ReaderT $ \r -> x r >>= flip runReaderT r
 
 liftReaderT :: m a -> ReaderT r m a
 liftReaderT m = ReaderT (const m)
@@ -732,7 +732,6 @@ instance Monad m => Applicative (MaybeT m) where
 
 instance Monad m => Monad (MaybeT m) where
   MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
-  join = MaybeT . (maybe (pure Nothing) runMaybeT <=< runMaybeT)
 
 instance Monad m =>
          Alternative (MaybeT m) where
@@ -762,7 +761,6 @@ instance Monad m =>
 
 instance Monad m => Monad (ExceptT e m) where
   ExceptT xs >>= f = ExceptT (xs >>= either (pure . Left) (runExceptT . f))
-  join = ExceptT . (either (pure . Left) runExceptT <=< runExceptT)
 
 instance (Monad m, Monoid e) => Alternative (ExceptT e m) where
   empty = ExceptT (pure (Left mempty))
@@ -795,4 +793,3 @@ instance Monad m =>
     (>>=) =
         (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
-    join (IdentityT xs) = IdentityT (xs >>= runIdentityT)
