@@ -21,6 +21,7 @@ library
                      , Control.Monad.Constrained.Error
                      , Control.Monad.Constrained.Writer
                      , Control.Monad.Constrained.IO
+                     , Control.Monad.Constrained.Cont
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5
                      , transformers >= 0.5
