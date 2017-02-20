@@ -8,7 +8,11 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | A module for constrained monads (set, etc)
+-- | A module for constrained monads. This module is intended to be imported
+-- with the @-XRebindableSyntax@ extension turned on: everything from the
+-- Prelude (that doesn't conflict with the new 'Functor', 'Applicative', etc) is
+-- reexported, so these type classes can be used the same way that the Prelude
+-- classes are used.
 module Control.Monad.Constrained
   (
    -- * Basic Classes
@@ -80,14 +84,14 @@ import           Control.Arrow (first)
 -- Type-level shenanigans
 --------------------------------------------------------------------------------
 
--- | A heterogeneous list, for storing the arguments to 'liftAP. (There /has/ to
+-- | A heterogeneous list, for storing the arguments to 'liftA'. (There /has/ to
 -- be a better way to do this).
 infixr 5 :-
 data Vect xs where
   Nil  :: Vect '[]
   (:-) :: x -> Vect xs -> Vect (x ': xs)
 
--- | Another heterogeneous list, for storing the arguments to 'liftAP, wrapped
+-- | Another heterogeneous list, for storing the arguments to 'liftA', wrapped
 -- in their applicatives.
 infixr 5 :*
 data AppVect f xs where
