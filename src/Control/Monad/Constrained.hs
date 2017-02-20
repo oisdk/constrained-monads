@@ -25,6 +25,7 @@ module Control.Monad.Constrained
   ,
    -- * Useful functions
    guard
+  ,(<**>)
   ,(<$>)
   ,(=<<)
   ,(<=<)
@@ -119,12 +120,15 @@ class Functor f  where
     --    type 'Suitable' 'Set' a = 'Ord' a
     --    'fmap' = 'Set.map'@
     type Suitable f a :: Constraint
+
+    -- | Maps a function over a functor
     fmap
         :: Suitable f b
         => (a -> b) -> f a -> f b
     default fmap :: Prelude.Functor f => (a -> b) -> f a -> f b
     fmap = Prelude.fmap
 
+    -- | Replace all values in the input with a default value.
     infixl 4 <$
     (<$) :: Suitable f a => a -> f b -> f a
     default (<$) :: Prelude.Functor f => a -> f b -> f a
@@ -133,11 +137,15 @@ class Functor f  where
 
 class Functor f =>
       Applicative f  where
+
+    -- | Lift a value.
     pure
         :: Suitable f a
         => a -> f a
     {-# INLINE pure #-}
     infixl 4 <*>
+
+    -- | Sequential application.
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
@@ -148,6 +156,7 @@ class Functor f =>
     (<*>) = (Prelude.<*>)
 
     infixl 4 *>
+    -- | Sequence actions, discarding the value of the first argument.
     (*>)
         :: Suitable f b
         => f a -> f b -> f b
@@ -156,6 +165,7 @@ class Functor f =>
     {-# INLINE (*>) #-}
 
     infixl 4 <*
+    -- | Sequence actions, discarding the value of the second argument.
     (<*)
         :: Suitable f a
         => f a -> f b -> f a
@@ -313,6 +323,10 @@ class Functor f =>
                   f r s t u v w x y z)
             (rs :* ss :* ts :* us :* vs :* ws :* xs :* ys :* OneA zs)
 
+-- | A variant of '<*>' with the arguments reversed.
+(<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
+(<**>) = liftA2 (flip ($))
+
 liftA' :: (Prelude.Applicative f) => (Vect xs -> b) -> (AppVect f xs -> f b)
 liftA' f (OneA xs) = Prelude.fmap (f . One) xs
 liftA' f (x :* xs) =  ((f .) . (:-)) Prelude.<$> x Prelude.<*> liftA' id xs
@@ -358,6 +372,44 @@ class (Foldable t, Functor t) =>
 --------------------------------------------------------------------------------
 
 infixl 4 <$>
+-- | An infix synonym for 'fmap'.
+--
+-- The name of this operator is an allusion to '$'.
+-- Note the similarities between their types:
+--
+-- >  ($)  ::              (a -> b) ->   a ->   b
+-- > (<$>) :: Functor f => (a -> b) -> f a -> f b
+--
+-- Whereas '$' is function application, '<$>' is function
+-- application lifted over a 'Functor'.
+--
+-- ==== __Examples__
+--
+-- Convert from a @'Maybe' 'Int'@ to a @'Maybe' 'String'@ using 'show':
+--
+-- >>> show <$> Nothing
+-- Nothing
+-- >>> show <$> Just 3
+-- Just "3"
+--
+-- Convert from an @'Either' 'Int' 'Int'@ to an @'Either' 'Int'@
+-- 'String' using 'show':
+--
+-- >>> show <$> Left 17
+-- Left 17
+-- >>> show <$> Right 17
+-- Right "17"
+--
+-- Double each element of a list:
+--
+-- >>> (*2) <$> [1,2,3]
+-- [2,4,6]
+--
+-- Apply 'even' to the second element of a pair:
+--
+-- >>> even <$> (2,2)
+-- (2,True)
+--
 (<$>) :: (Functor f, Suitable f b) => (a -> b) -> f a -> f b
 (<$>) = fmap
 

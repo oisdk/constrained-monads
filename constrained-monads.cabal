@@ -22,6 +22,7 @@ library
                      , Control.Monad.Constrained.Writer
                      , Control.Monad.Constrained.IO
                      , Control.Monad.Constrained.Cont
+                     , Control.Monad.Constrained.IntSet
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5
                      , transformers >= 0.5
