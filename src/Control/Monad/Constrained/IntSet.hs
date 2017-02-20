@@ -19,7 +19,6 @@ module Control.Monad.Constrained.IntSet
   ,filter
   ,partition
   ,split
-  ,fromList
   ,maxView
   ,minView)
   where
@@ -33,6 +32,7 @@ import           Data.Functor.Classes
 import           Data.Semigroup
 
 import           Control.Arrow             (first)
+import           GHC.Exts
 
 -- | This type is a wrapper around 'Data.IntSet.IntSet', with a phantom type
 -- variable which must always be 'Int'. This allows it to conform to 'Functor',
@@ -85,6 +85,11 @@ instance Alternative IntSet where
 
 instance Monad IntSet where
     (>>=) = flip foldMap
+
+instance a ~ Int => IsList (IntSet a) where
+  type Item (IntSet a) = a
+  fromList = IntSet . IntSet.fromList
+  toList = foldr (:) []
 
 infixl 9 \\
 -- | /O(n+m)/. See 'difference'.
@@ -159,10 +164,6 @@ split x (IntSet xs) =
     let (ys,zs) = IntSet.split x xs
     in (IntSet ys, IntSet zs)
 
--- | /O(n*min(n,W))/. Create a set from a list of integers.
-fromList :: [Int] -> IntSet Int
-fromList xs = IntSet (IntSet.fromList xs)
-
 -- | /O(min(n,W))/. Retrieves the maximal key of the set, and the set
 -- stripped of that element, or 'Nothing' if passed an empty set.
 maxView :: IntSet a -> Maybe (a, IntSet a)
@@ -174,22 +175,26 @@ minView :: IntSet a -> Maybe (a, IntSet a)
 minView (IntSet xs) = (fmap.fmap) IntSet (IntSet.minView xs)
 
 instance Show1 IntSet where
-  liftShowsPrec _ _ d (IntSet xs) = showsPrec d xs
+    liftShowsPrec _ _ d (IntSet xs) = showsPrec d xs
 
-instance Show a => Show (IntSet a) where
-  showsPrec = showsPrec1
+instance Show a =>
+         Show (IntSet a) where
+    showsPrec = showsPrec1
 
-instance a ~ Int => Read (IntSet a) where
-  readsPrec n = (fmap.first) IntSet . readsPrec n
+instance a ~ Int =>
+         Read (IntSet a) where
+    readsPrec n = (fmap . first) IntSet . readsPrec n
 
 instance Eq1 IntSet where
-  liftEq _ (IntSet xs) (IntSet ys) = xs == ys
+    liftEq _ (IntSet xs) (IntSet ys) = xs == ys
 
-instance Eq a => Eq (IntSet a) where
-  (==) = eq1
+instance Eq a =>
+         Eq (IntSet a) where
+    (==) = eq1
 
 instance Ord1 IntSet where
-  liftCompare _ (IntSet xs) (IntSet ys) = compare xs ys
+    liftCompare _ (IntSet xs) (IntSet ys) = compare xs ys
 
-instance Ord a => Ord (IntSet a) where
-  compare = compare1
+instance Ord a =>
+         Ord (IntSet a) where
+    compare = compare1

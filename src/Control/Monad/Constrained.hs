@@ -267,7 +267,7 @@ class Functor f =>
     -- monad).
     --
     -- The one missing piece is @-XApplicativeDo@: I can't figure out a way
-    -- to get do-notation to desugar to using the 'liftAP functions, rather
+    -- to get do-notation to desugar to using the 'liftA' functions, rather
     -- than @('<*>')@.
     --
     -- It would also be preferable to avoid the two intermediate structures
