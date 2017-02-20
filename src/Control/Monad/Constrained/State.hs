@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
+-- | This module duplicates the Control.Monad.State module from mtl for monads
+-- with constraints.
 module Control.Monad.Constrained.State
   (MonadState(..)
   ,StateT(..)
@@ -29,11 +31,12 @@ import qualified Control.Monad.Trans.Maybe        as Maybe
 import qualified Control.Monad.Trans.Reader       as Reader
 import qualified Control.Monad.Trans.Except       as Except
 
-
+-- | A class for monads with state.
 class Monad m =>
       MonadState s m  | m -> s where
     {-# MINIMAL state #-}
     type StateSuitable m a :: Constraint
+    -- | Return the state from the internals of the monad.
     get
         :: (StateSuitable m s)
         => m s
@@ -41,19 +44,23 @@ class Monad m =>
         state
             (\s ->
                   (s, s))
+    -- | Replace the state inside the monad.
     put
         :: (StateSuitable m (), StateSuitable m s)
         => s -> m ()
     put s = state (const ((), s))
+    -- | Embed a simple state action in the monad.
     state
         :: (StateSuitable m a, StateSuitable m s)
         => (s -> (a, s)) -> m a
 
+-- | Get the state, while applying a transformation function.
 gets
     :: (StateSuitable m s, MonadState s m, Suitable m b)
     => (s -> b) -> m b
 gets f = fmap f get
 
+-- | Modify the state.
 modify
     :: (StateSuitable m (), StateSuitable m s, MonadState s m)
     => (s -> s) -> m ()
@@ -62,6 +69,7 @@ modify f =
         (\s ->
               ((), f s))
 
+-- | Modify the state, strictly in the new state.
 modify'
     :: (StateSuitable m (), StateSuitable m s, MonadState s m)
     => (s -> s) -> m ()

@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- | This module duplicates the "Control.Monad.Trans.Class" module for
+-- constrained monads.
 module Control.Monad.Constrained.Trans
   (MonadTrans(..))
   where
@@ -18,8 +20,18 @@ import           Control.Monad.Trans.State.Strict as Strict (StateT (..))
 
 import           GHC.Exts
 
+-- | A class for monad transformers with constraints. See
+-- "Control.Monad.Trans.Class" for full documentation on the class without
+-- constraints.
 class MonadTrans t  where
+    -- | A type for monads that are liftable into the outer monad. For instance,
+    -- since 'StateT' is defined like so:
+    --
+    -- @newtype 'StateT' s m a = 'StateT' { 'runStateT' :: s -> m (a, s) }@
+    --
+    -- the underlying monad needs not to be able to hold @a@, but @(a, s)@.
     type SuitableLift (t :: (* -> *) -> * -> *) (m :: * -> *) (a :: *) :: Constraint
+    -- | Lift a monad into an outer monad.
     lift
         :: (Monad m, SuitableLift t m a)
         => m a -> t m a

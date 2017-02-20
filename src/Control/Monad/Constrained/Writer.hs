@@ -9,10 +9,13 @@
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE ViewPatterns           #-}
 
+-- | This module duplicates the Control.Monad.Writer module from the mtl, for
+-- constrained monads. It also provides a non-leaky writer monad.
 module Control.Monad.Constrained.Writer
   (MonadWriter(..)
   ,WriterT
   ,pattern WriterT
+  ,Writer
   ,runWriterT
   ,execWriterT
   ,execWriter
@@ -42,11 +45,20 @@ import           Control.Monad.Constrained.Reader
 import           Data.Functor.Identity
 import           Data.Functor.Classes
 
+-- | A class for monads with logging ability.
 class (Monoid w, Monad m) => MonadWriter w m | m -> w where
     type WriterSuitable m a :: Constraint
+    -- | Embed a simple writer action.
     writer  :: WriterSuitable m a => (a,w) -> m a
+    -- | Log some output.
     tell    :: WriterSuitable m () => w -> m ()
+    -- | This is equivalent to the 'Control.Monad.Trans.Writer.Lazy.listen'
+    -- function, except it is church encoded, to make the constraints a little
+    -- easier to manage.
     listenC :: WriterSuitable m b => (a -> w -> b) -> m a -> m b
+    -- | This is equivalent to the 'Control.Monad.Trans.Writer.Lazy.pass'
+    -- function, except it is church encoded, to make the constraints a little
+    -- easier to manage.
     passC   :: WriterSuitable m a => (a -> w -> w) -> m a -> m a
 
 instance MonadWriter w m =>
@@ -60,11 +72,16 @@ instance MonadWriter w m =>
     listenC f = (Except.mapExceptT . listenC . flip) (fmap . flip f)
     passC = Except.mapExceptT . passC . either (const id)
 
+-- | @'listen' m@ is an action that executes the action @m@ and adds
+-- its output to the value of the computation.
 listen
     :: (MonadWriter w m, WriterSuitable m (a, w))
     => m a -> m (a, w)
 listen = listenC (,)
 
+-- | @'pass' m@ is an action that executes the action @m@, which
+-- returns a value and a function, and returns the value, applying
+-- the function to the output.
 pass
     :: (MonadWriter w m, Suitable m a, WriterSuitable m (a, w -> w))
     => m (a, w -> w) -> m a

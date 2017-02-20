@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
+-- | This module is a duplication of the Control.Monad.Error module from the
+-- mtl, for constrained monads.
 module Control.Monad.Constrained.Error
   (MonadError(..)
   ,ExceptT(..)
@@ -24,10 +26,21 @@ import qualified Control.Monad.Trans.Reader       as Reader
 import qualified Control.Monad.Trans.State.Lazy   as State.Lazy
 import qualified Control.Monad.Trans.State.Strict as State.Strict
 
+-- | A class for monads which can error out.
 class Monad m =>
       MonadError e m  | m -> e where
     type SuitableError m a :: Constraint
+    -- | Raise an error.
     throwError :: SuitableError m a => e -> m a
+    {- |
+    A handler function to handle previous errors and return to normal execution.
+    A common idiom is:
+
+    > do { action1; action2; action3 } `catchError` handler
+
+    where the @action@ functions can call 'throwError'.
+    Note that @handler@ and the do-block must have the same return type.
+    -}
     catchError :: SuitableError m a => m a -> (e -> m a) -> m a
 
 instance MonadError e (Either e) where

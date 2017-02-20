@@ -5,6 +5,8 @@
 {-# LANGUAGE RebindableSyntax       #-}
 {-# LANGUAGE TypeFamilies           #-}
 
+-- | This module duplicates the Control.Monad.Reader module from the mtl, for
+-- constrained monads.
 module Control.Monad.Constrained.Reader
   (MonadReader(..)
   ,ReaderT(..)
@@ -25,20 +27,28 @@ import qualified Control.Monad.Trans.Identity     as Identity
 import qualified Control.Monad.Trans.Maybe        as Maybe
 import qualified Control.Monad.Trans.Except       as Except
 
+-- | A class for reader monads.
 class Monad m =>
       MonadReader r m  | m -> r where
     type ReaderSuitable m a :: Constraint
     {-# MINIMAL reader , local #-}
+    -- | Retrieves the environment
     ask
         :: (ReaderSuitable m r)
         => m r
     ask = reader id
+    -- | Executes a computation in a modified environment.
     local
         :: (ReaderSuitable m a, ReaderSuitable m r)
-        => (r -> r) -> m a -> m a
+        => (r -> r) -- ^ The function to modify the environment.
+        -> m a      -- ^ @Reader@ to run in the modified environment.
+        -> m a
+
+    -- | Retrieves a function of the current environment.
     reader
         :: (ReaderSuitable m r, ReaderSuitable m a)
-        => (r -> a) -> m a
+        => (r -> a) -- ^ The selector function to apply to the environment.
+        -> m a
 
 instance MonadReader r ((->) r) where
     type ReaderSuitable ((->) r) a = ()
