@@ -75,24 +75,14 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    liftA f (OneA xs) = fmap (f . One) xs
-    liftA f (x :* xs) =
-        x >>=
-        \y ->
-             liftA (f . (y :-)) xs
+    liftA = liftAM
 
 instance Alternative IntSet where
     empty = mempty
     (<|>) = mappend
 
 instance Monad IntSet where
-    IntSet xs >>= f =
-        IntSet.foldl'
-            (\a e ->
-                  mappend a (f e))
-            mempty
-            xs
-    join _ = undefined
+    (>>=) = flip foldMap
 
 infixl 9 \\
 (\\) :: IntSet a -> IntSet a -> IntSet a

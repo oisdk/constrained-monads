@@ -149,16 +149,10 @@ instance Monad m =>
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
-    liftA f (OneA xs) = fmap (f . One) xs
-    liftA f (WriterT_ x :* xs) =
-        WriterT_ . State.Strict.StateT $
-        \s -> do
-            (x',s') <- State.Strict.runStateT x s
-            State.Strict.runStateT (unWriterT (liftA (f . (x' :-)) xs)) s'
+    liftA = liftAM
 
 instance Monad m => Monad (WriterT s m) where
   WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))
-  join (WriterT_ xs) = WriterT_ (xs >>= unWriterT)
 
 -- first_  :: (Functor f, Suitable f (b, c)) => (a -> f b) -> (a, c) -> f (b, c)
 -- first_  f (x,y) = fmap (flip (,) y) (f x)
