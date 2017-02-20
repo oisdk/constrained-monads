@@ -691,7 +691,7 @@ instance Functor m =>
          Functor (ExceptT e m) where
     type Suitable (ExceptT e m) a = Suitable m (Either e a)
     fmap f (ExceptT xs) = ExceptT ((fmap . fmap) f xs)
-    x <$ (ExceptT xs) = ExceptT (fmap (x <$) xs)
+    x <$ ExceptT xs = ExceptT (fmap (x <$) xs)
 
 instance Monad m =>
          Applicative (ExceptT e m) where
