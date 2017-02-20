@@ -10,8 +10,8 @@
 
 -- | A module for constrained monads. This module is intended to be imported
 -- with the @-XRebindableSyntax@ extension turned on: everything from the
--- Prelude (that doesn't conflict with the new 'Functor', 'Applicative', etc) is
--- reexported, so these type classes can be used the same way that the Prelude
+-- "Prelude" (that doesn't conflict with the new 'Functor', 'Applicative', etc) is
+-- reexported, so these type classes can be used the same way that the "Prelude"
 -- classes are used.
 module Control.Monad.Constrained
   (
@@ -117,7 +117,7 @@ data AppVect f xs where
 -- The way that types indicate what they can contain is with the 'Suitable'
 -- associated type.
 --
--- The default implementation is for types which conform to the Prelude's
+-- The default implementation is for types which conform to the "Prelude"'s
 -- 'Prelude.Functor'. The way to make a standard 'Prelude.Functor' conform
 -- is by indicating that it has no constraints. For instance, for @[]@:
 --
@@ -397,7 +397,7 @@ class Functor f =>
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
--- | A definition of 'liftA' which uses the Prelude's @('Prelude.<*>')@.
+-- | A definition of 'liftA' which uses the "Prelude"'s @('Prelude.<*>')@.
 liftAP :: (Prelude.Applicative f) => (Vect xs -> b) -> (AppVect f xs -> f b)
 liftAP f NilA = Prelude.pure (f Nil)
 liftAP f (x :* NilA) = Prelude.fmap (f . (:-Nil)) x
@@ -434,7 +434,7 @@ The above laws imply:
 and that 'pure' and ('<*>') satisfy the applicative functor laws.
 
 The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
-defined in the "Prelude" satisfy these laws.
+defined in the ""Prelude"" satisfy these laws.
 -}
 class Applicative f =>
       Monad f  where
