@@ -16,6 +16,11 @@ import           Data.Proxy
 
 import qualified Control.Applicative
 
+import           Data.Set (Set)
+import           Control.Monad.Constrained.IntSet (IntSet)
+
+import           GHC.Exts (fromList)
+
 instance Functor Gen where
   type Suitable Gen a = ()
   fmap = Prelude.fmap
@@ -26,6 +31,9 @@ instance Applicative Gen where
 
 instance Monad Gen where
   (>>=) = (Prelude.>>=)
+
+instance a ~ Int => Arbitrary (IntSet a) where
+  arbitrary = fmap fromList arbitrary
 
 fmapIsSame
     :: (Functor f, Prelude.Functor f, Suitable f b, Eq (f b), Show (f b))
@@ -93,10 +101,8 @@ checkSame
        ,Prelude.Monad f
        ,Show (f b)
        ,Show (f c)
-       -- ,Eq (f c)
        ,CoArbitrary c
        ,Arbitrary (f c)
-       -- ,Eq (f b)
        ,Arbitrary (f a)
        ,Arbitrary (f (b -> a))
        ,CoArbitrary b
@@ -117,9 +123,72 @@ checkSame (_ :: Proxy f) (_ :: Proxy a) (_ :: Proxy b) (_ :: Proxy c) = do
   quickCheck (liftA2IsSame @ f @ a @ b @ c)
   quickCheck (bindIsSame @ f @ a @ b)
 
+checkConstrained
+    :: (Show (f a)
+       ,Arbitrary (f a)
+       ,Suitable f a
+       ,Eq (f a)
+       ,Show (f c)
+       ,CoArbitrary c
+       ,CoArbitrary b
+       ,Arbitrary a
+       ,Arbitrary (f c)
+       ,Suitable f b
+       ,Show (f b)
+       ,Arbitrary (f b)
+       ,Show a
+       ,CoArbitrary a
+       ,Eq (f b)
+       ,Monad f
+       ,Arbitrary b)
+    => Proxy f -> Proxy a -> Proxy b -> Proxy c -> IO ()
+checkConstrained (_ :: Proxy f) (_ :: Proxy a) (_ :: Proxy b) (_ :: Proxy c) = do
+  quickCheck (fmapLaw @ f @ a)
+  quickCheck (fmapCompLaw @ f @ a @ b @ c)
+  quickCheck (seqRightLaw @ f @ a @ b)
+  quickCheck (seqLeftLaw @ f @ a @ b)
+  quickCheck (monadLawOne @ f @ a @ b)
+  quickCheck (monadLawTwo @ f @ a)
+  quickCheck (monadLawThree @ f @ a @ b @ c)
+
+checkUnConstrained
+    :: (Show (f a)
+       ,Arbitrary (f a)
+       ,Suitable f a
+       ,Suitable f ((a -> b) -> (c -> a) -> c -> b)
+       ,Arbitrary (f (a -> b))
+       ,Arbitrary (f (c -> a))
+       ,Suitable f ((c -> a) -> c -> b)
+       ,Suitable f (c -> b)
+       ,Suitable f (a -> b)
+       ,Suitable f ((a -> b) -> b)
+       ,Eq (f a)
+       ,Show (f c)
+       ,CoArbitrary c
+       ,CoArbitrary b
+       ,Arbitrary a
+       ,Arbitrary (f c)
+       ,Suitable f b
+       ,Show (f b)
+       ,Arbitrary (f b)
+       ,Show a
+       ,CoArbitrary a
+       ,Eq (f b)
+       ,Monad f
+       ,Suitable f (a -> a)
+       ,Arbitrary b)
+    => Proxy f -> Proxy a -> Proxy b -> Proxy c -> IO ()
+checkUnConstrained (pf :: Proxy f) (pa :: Proxy a) (pb :: Proxy b) (pc :: Proxy c) = do
+  checkConstrained pf pa pb pc
+  quickCheck (appIdLaw @ f @ a)
+  quickCheck (appCompLaw @ f @ a @ b @ c)
+  quickCheck (homomorphismLaw (Proxy :: Proxy f) :: Blind (a -> b) -> a -> Property)
+  quickCheck (interchangeLaw @ f @ a @ b)
+
+
 {-# ANN fmapLaw "HLint: ignore Functor law" #-}
 fmapLaw
-    :: (Applicative f, Suitable f a, Eq (f a), Show (f a))
+    :: (Functor f, Suitable f a, Eq (f a), Show (f a))
     => f a -> Property
 fmapLaw xs = fmap id xs === xs
 
@@ -128,6 +197,16 @@ fmapCompLaw
     :: (Functor f, Suitable f c, Eq (f c), Show (f c), Suitable f b)
     => Blind (b -> c) -> Blind (a -> b) -> f a -> Property
 fmapCompLaw (Blind f) (Blind g) xs = fmap (f . g) xs === (fmap f . fmap g) xs
+
+seqRightLaw
+    :: (Applicative f, Suitable f b, Eq (f b), Show (f b))
+    => f a -> f b -> Property
+seqRightLaw xs ys = (xs *> ys) === (liftA2 (const id) xs ys)
+
+seqLeftLaw
+    :: (Applicative f, Suitable f a, Eq (f a), Show (f a))
+    => f a -> f b -> Property
+seqLeftLaw xs ys = (xs <* ys) === (liftA2 const xs ys)
 
 appIdLaw
     :: (Applicative f, Suitable f a, Suitable f (a -> a), Eq (f a), Show (f a))
@@ -186,15 +265,11 @@ monadLawThree m (Blind k) (Blind h) =
 
 main :: IO ()
 main = do
-  checkSame (Proxy :: Proxy []) (Proxy :: Proxy Integer) (Proxy :: Proxy Word) (Proxy :: Proxy Int)
-  quickCheck (fmapLaw @ [] @ Int)
-  quickCheck (appIdLaw @ [] @ Int)
-  quickCheck (appCompLaw @ [] @ Integer @ Int @ Word)
-  quickCheck (homomorphismLaw (Proxy :: Proxy []) :: Blind (Integer -> Word) -> Integer -> Property)
-  quickCheck (interchangeLaw @ [] @ Word @ Int)
-  quickCheck (monadLawOne @ [] @ Word @ Int)
-  quickCheck (monadLawTwo @ [] @ Word)
-  quickCheck (monadLawThree @ [] @ Word @ Int @ Integer)
+  checkSame          (Proxy :: Proxy [] )    (Proxy :: Proxy Integer) (Proxy :: Proxy Word) (Proxy :: Proxy Int)
+  checkUnConstrained (Proxy :: Proxy [] )    (Proxy :: Proxy Integer) (Proxy :: Proxy Word) (Proxy :: Proxy Int)
+  checkConstrained   (Proxy :: Proxy Set)    (Proxy :: Proxy Integer) (Proxy :: Proxy Word) (Proxy :: Proxy Int)
+  checkConstrained   (Proxy :: Proxy IntSet) (Proxy :: Proxy Int) (Proxy :: Proxy Int) (Proxy :: Proxy Int)
+
   doctest
     [ "-isrc"
     , "src/" ]
