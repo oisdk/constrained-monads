@@ -72,6 +72,7 @@ import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
+import           Data.Tree                        (Tree(..))
 
 import           Control.Monad.Trans.Cont         (ContT)
 import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
@@ -80,7 +81,7 @@ import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Control.Monad.Trans.Reader       (ReaderT (..), mapReaderT)
 import           Control.Monad.Trans.State        (StateT (..))
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT (..))
-import Control.Monad.Trans.State.Strict (state, runState)
+import           Control.Monad.Trans.State.Strict (state, runState)
 
 import           Control.Arrow (first)
 import           Data.Tuple (swap)
@@ -160,6 +161,7 @@ class Functor f  where
     infixl 4 <$
     (<$) :: Suitable f a => a -> f b -> f a
     (<$) = fmap . const
+    {-# INLINE (<$) #-}
 
 -- | A functor with application.
 --
@@ -213,6 +215,7 @@ class Functor f =>
         :: Suitable f a
         => a -> f a
     pure x = liftA (\Nil -> x) NilA
+    {-# INLINE pure #-}
 
     infixl 4 <*>
 
@@ -221,6 +224,7 @@ class Functor f =>
         :: Suitable f b
         => f (a -> b) -> f a -> f b
     fs <*> xs = liftA (\(f :- x :- Nil) -> f x) (fs :* xs :* NilA)
+    {-# INLINE (<*>) #-}
 
     infixl 4 *>
     -- | Sequence actions, discarding the value of the first argument.
@@ -228,6 +232,7 @@ class Functor f =>
         :: Suitable f b
         => f a -> f b -> f b
     (*>) = liftA2 (flip const)
+    {-# INLINE (*>) #-}
 
     infixl 4 <*
     -- | Sequence actions, discarding the value of the second argument.
@@ -235,6 +240,7 @@ class Functor f =>
         :: Suitable f a
         => f a -> f b -> f a
     (<*) = liftA2 const
+    {-# INLINE (<*) #-}
     -- | The shenanigans introduced by this function are to account for the fact
     -- that you can't (I don't think) write an arbitrary lift function on
     -- non-monadic applicatives that have constrained types. For instance, if
@@ -743,11 +749,11 @@ replicateM cnt0 f =
 --
 -- Discard the result of an 'System.IO.IO' action:
 --
--- >>> mapM print [1,2]
+-- >>> traverse print [1,2]
 -- 1
 -- 2
 -- [(),()]
--- >>> void $ mapM print [1,2]
+-- >>> void $ traverse print [1,2]
 -- 1
 -- 2
 void :: (Functor f, Suitable f ()) => f a -> f ()
@@ -931,9 +937,9 @@ instance Functor IntMap where
     (<$) = (Prelude.<$)
 
 instance Functor Seq where
-  type Suitable Seq a = ()
-  fmap = Prelude.fmap
-  (<$) = (Prelude.<$)
+    type Suitable Seq a = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
 
 instance Applicative Seq where
     liftA = liftAP
@@ -947,6 +953,21 @@ instance Alternative Seq where
     (<|>) = (Control.Applicative.<|>)
 
 instance Monad Seq where
+    (>>=) = (Prelude.>>=)
+
+instance Functor Tree where
+    type Suitable Tree a = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
+
+instance Applicative Tree where
+    liftA = liftAP
+    (<*>) = (Prelude.<*>)
+    (*>) = (Prelude.*>)
+    (<*) = (Prelude.<*)
+    pure = Prelude.pure
+
+instance Monad Tree where
     (>>=) = (Prelude.>>=)
 
 instance Functor ((->) a) where
@@ -968,6 +989,7 @@ instance Functor (ContT r m) where
     type Suitable (ContT r m) a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+
 instance Applicative (ContT r m) where
     liftA = liftAP
     (<*>) = (Prelude.<*>)

@@ -203,7 +203,7 @@ type Writer s = WriterT s Identity
 
 -- | Run a writer computation.
 --
--- >>> runWriter $ traverse (\x -> Writer (show x, [x])) [1..5]
+-- >>> runWriter $ traverse (\x -> writer (show x, [x])) [1..5]
 -- (["1","2","3","4","5"],[1,2,3,4,5])
 runWriter
     :: Monoid s
