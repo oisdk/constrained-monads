@@ -231,7 +231,7 @@ class Functor f =>
     (*>)
         :: Suitable f b
         => f a -> f b -> f b
-    (*>) = liftA2 (flip const)
+    (*>) = liftA2 (const id)
     {-# INLINE (*>) #-}
 
     infixl 4 <*
@@ -1040,8 +1040,9 @@ instance Monad m =>
     Strict.StateT xs <* Strict.StateT ys =
         Strict.StateT $
         \(!s) -> do
-            (_,s') <- ys s
-            xs s'
+            (x,s') <- xs s
+            (_,s'') <- ys s'
+            pure (x,s'')
     liftA = liftAM
 
 instance (Monad m, Alternative m) => Alternative (Strict.StateT s m) where
@@ -1084,8 +1085,9 @@ instance (Monad m) =>
     StateT xs <* StateT ys =
         StateT $
         \s -> do
-            ~(_,s') <- ys s
-            xs s'
+            ~(x,s') <- xs s
+            ~(_,s'') <- ys s'
+            pure (x,s'')
     liftA = liftAM
 
 instance (Monad m, Alternative m) => Alternative (StateT s m) where
