@@ -38,10 +38,13 @@ module Control.Monad.Constrained
   ,(>=>)
   ,foldM
   ,traverse_
+  ,sequenceA
+  ,sequenceA_
+  ,mapAccumL
   ,replicateM
   ,void
-  ,some
-  ,many
+  ,forever
+  ,for_
   ,
    -- * Syntax
    ifThenElse
@@ -77,8 +80,10 @@ import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Control.Monad.Trans.Reader       (ReaderT (..), mapReaderT)
 import           Control.Monad.Trans.State        (StateT (..))
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT (..))
+import Control.Monad.Trans.State.Strict (state, runState)
 
 import           Control.Arrow (first)
+import           Data.Tuple (swap)
 
 --------------------------------------------------------------------------------
 -- Type-level shenanigans
@@ -135,7 +140,7 @@ data AppVect f xs where
 --  x '<$' xs = if 'null' xs then 'empty' else 'pure' x@
 --
 -- It can also be made conform to 'Foldable', etc. This type is provided in
--- @Control.Monad.Constrained.IntSet@.
+-- "Control.Monad.Constrained.IntSet".
 class Functor f  where
     {-# MINIMAL fmap #-}
     -- | Indicate which types can be contained by 'f'. For instance,
@@ -156,13 +161,13 @@ class Functor f  where
     (<$) :: Suitable f a => a -> f b -> f a
     (<$) = fmap . const
 
--- | A functor with application, providing operations to
+-- | A functor with application.
 --
--- * embed pure expressions ('pure'), and
+-- This class is slightly different (although equivalent) to the class
+-- provided in the Prelude. This is to facilitate the lifting of functions
+-- to arbitrary numbers of arguments.
 --
--- * sequence computations and combine their results ('<*>').
---
--- A minimal complete definition must include implementations of these
+-- A minimal complete definition must include implementations of 'liftA'
 -- functions satisfying the following laws:
 --
 -- [/identity/]
@@ -434,23 +439,135 @@ defined in the "Prelude" satisfy these laws.
 class Applicative f =>
       Monad f  where
     infixl 1 >>=
+    -- | Sequentially compose two actions, passing any value produced
+    -- by the first as an argument to the second.
     (>>=)
         :: Suitable f b
         => f a -> (a -> f b) -> f b
-
+-- | A monoid on applicative functors.
+--
+-- If defined, 'some' and 'many' should be the least solutions
+-- of the equations:
+--
+-- * @some v = (:) '<$>' v '<*>' many v@
+--
+-- * @many v = some v '<|>' 'pure' []@
 class Applicative f =>
       Alternative f  where
+    {-# MINIMAL empty, (<|>) #-}
+    -- | The identity of '<|>'
     empty :: Suitable f a => f a
     infixl 3 <|>
+    -- | An associative binary operation
     (<|>)
         :: Suitable f a
         => f a -> f a -> f a
+    -- | One or more.
+    some :: Suitable f [a] => f a -> f [a]
+    some v = some_v
+      where
+        many_v = some_v <|> pure []
+        some_v = liftA2 (:) v many_v
 
+    -- | Zero or more.
+    many :: Suitable f [a] => f a -> f [a]
+    many v = many_v
+      where
+        many_v = some_v <|> pure []
+        some_v = liftA2 (:) v many_v
+
+-- | Functors representing data structures that can be traversed from
+-- left to right.
+--
+-- A definition of 'traverse' must satisfy the following laws:
+--
+-- [/naturality/]
+--   @t . 'traverse' f = 'traverse' (t . f)@
+--   for every applicative transformation @t@
+--
+-- [/identity/]
+--   @'traverse' Identity = Identity@
+--
+-- [/composition/]
+--   @'traverse' (Compose . 'fmap' g . f) = Compose . 'fmap' ('traverse' g) . 'traverse' f@
+--
+-- A definition of 'sequenceA' must satisfy the following laws:
+--
+-- [/naturality/]
+--   @t . 'sequenceA' = 'sequenceA' . 'fmap' t@
+--   for every applicative transformation @t@
+--
+-- [/identity/]
+--   @'sequenceA' . 'fmap' Identity = Identity@
+--
+-- [/composition/]
+--   @'sequenceA' . 'fmap' Compose = Compose . 'fmap' 'sequenceA' . 'sequenceA'@
+--
+-- where an /applicative transformation/ is a function
+--
+-- @t :: (Applicative f, Applicative g) => f a -> g a@
+--
+-- preserving the 'Applicative' operations, i.e.
+--
+--  * @t ('pure' x) = 'pure' x@
+--
+--  * @t (x '<*>' y) = t x '<*>' t y@
+--
+-- and the identity functor @Identity@ and composition of functors @Compose@
+-- are defined as
+--
+-- >   newtype Identity a = Identity a
+-- >
+-- >   instance Functor Identity where
+-- >     fmap f (Identity x) = Identity (f x)
+-- >
+-- >   instance Applicative Identity where
+-- >     pure x = Identity x
+-- >     Identity f <*> Identity x = Identity (f x)
+-- >
+-- >   newtype Compose f g a = Compose (f (g a))
+-- >
+-- >   instance (Functor f, Functor g) => Functor (Compose f g) where
+-- >     fmap f (Compose x) = Compose (fmap (fmap f) x)
+-- >
+-- >   instance (Applicative f, Applicative g) => Applicative (Compose f g) where
+-- >     pure x = Compose (pure (pure x))
+-- >     Compose f <*> Compose x = Compose ((<*>) <$> f <*> x)
+--
+-- (The naturality law is implied by parametricity.)
+--
+-- Instances are similar to 'Functor', e.g. given a data type
+--
+-- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
+--
+-- a suitable instance would be
+--
+-- > instance Traversable Tree where
+-- >    traverse f Empty = pure Empty
+-- >    traverse f (Leaf x) = Leaf <$> f x
+-- >    traverse f (Node l k r) = Node <$> traverse f l <*> f k <*> traverse f r
+--
+-- This is suitable even for abstract types, as the laws for '<*>'
+-- imply a form of associativity.
+--
+-- The superclass instances should satisfy the following:
+--
+--  * In the 'Functor' instance, 'fmap' should be equivalent to traversal
+--    with the identity applicative functor ('fmapDefault').
+--
+--  * In the 'Foldable' instance, 'Data.Foldable.foldMap' should be
+--    equivalent to traversal with a constant applicative functor
+--    ('foldMapDefault').
+--
 class (Foldable t, Functor t) =>
       Traversable t  where
+    -- | Map each element of a structure to an action, evaluate these actions
+    -- from left to right, and collect the results. For a version that ignores
+    -- the results see 'traverse_'.
     traverse
         :: (Suitable t b, Applicative f, Suitable f (t b))
         => (a -> f b) -> t a -> f (t b)
+
 
 --------------------------------------------------------------------------------
 -- useful functions
@@ -499,29 +616,87 @@ infixl 4 <$>
 (<$>) = fmap
 
 infixr 1 =<<, <=<
+-- | A flipped version of '>>='
 (=<<) :: (Monad f, Suitable f b) => (a -> f b) -> f a -> f b
 (=<<) = flip (>>=)
 
+-- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped.
+--
+-- Note how this operator resembles function composition @('.')@:
+--
+-- > (.)   ::            (b ->   c) -> (a ->   b) -> a ->   c
+-- > (<=<) :: Monad m => (b -> m c) -> (a -> m b) -> a -> m c
 (<=<) :: (Monad f, Suitable f c) => (b -> f c) -> (a -> f b) -> a -> f c
 (f <=< g) x = f =<< g x
 
 infixl 1 >=>
+
+-- | Left-to-right Kleisli composition of monads.
 (>=>) :: (Monad f, Suitable f c) => (a -> f b) -> (b -> f c) -> a -> f c
 (f >=> g) x = f x >>= g
 
-foldM :: (Monad m, Suitable m a, Foldable f) => (a -> b -> m a) -> a -> f b -> m a
-foldM f b = foldl (\a e -> flip f e =<< a) (pure b)
+-- | @'forever' act@ repeats the action infinitely.
+forever     :: (Applicative f, Suitable f b) => f a -> f b
+{-# INLINE forever #-}
+forever a   = let a' = a *> a' in a'
 
+-- | Monadic fold over the elements of a structure,
+-- associating to the left, i.e. from left to right.
+foldM :: (Foldable t, Monad m, Suitable m b) => (b -> a -> m b) -> b -> t a -> m b
+foldM f z0 xs = foldr f' pure xs z0
+  where f' x k z = f z x >>= k
+
+-- | 'for_' is 'traverse_' with its arguments flipped. For a version
+-- that doesn't ignore the results see 'Data.Traversable.for'.
+--
+-- >>> for_ [1..4] print
+-- 1
+-- 2
+-- 3
+-- 4
+for_ :: (Foldable t, Applicative f, Suitable f ()) => t a -> (a -> f b) -> f ()
+{-# INLINE for_ #-}
+for_ = flip traverse_
+
+-- | Map each element of a structure to an action, evaluate these
+-- actions from left to right, and ignore the results. For a version
+-- that doesn't ignore the results see 'traverse'.
 traverse_ :: (Applicative f, Foldable t, Suitable f ()) => (a -> f b) -> t a -> f ()
 traverse_ f = foldr (\e a -> f e *> a) (pure ())
 
+-- | Evaluate each action in the structure from left to right, and
+-- ignore the results. For a version that doesn't ignore the results
+-- see 'Data.Traversable.sequenceA'.
+sequenceA_ :: (Foldable t, Applicative f, Suitable f ()) => t (f a) -> f ()
+sequenceA_ = foldr (*>) (pure ())
+
+-- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
+-- and 'empty' if @b@ is 'False'.
 guard :: (Alternative f, Suitable f ()) => Bool -> f ()
 guard True = pure ()
 guard False = empty
 
+-- | @'ensure' b x@ is @x@ if @b@ is 'True',
+-- and 'empty' if @b@ is 'False'.
 ensure :: (Alternative f, Suitable f a) => Bool -> f a -> f a
 ensure True x = x
 ensure False _ = empty
+
+-- | Evaluate each action in the structure from left to right, and
+-- and collect the results. For a version that ignores the results
+-- see 'sequenceA_'.
+sequenceA
+    :: (Applicative f, Suitable t a, Suitable f (t a), Traversable t)
+    => t (f a) -> f (t a)
+sequenceA = traverse id
+
+-- |The 'mapAccumL' function behaves like a combination of 'fmap'
+-- and 'foldl'; it applies a function to each element of a structure,
+-- passing an accumulating parameter from left to right, and returning
+-- a final value of this accumulator together with the new structure.
+mapAccumL :: (Traversable t, Suitable t c) => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumL f s t = swap $ runState (traverse (state . (swap .: flip f)) t) s where
+  (.:) = (.).(.)
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
@@ -536,38 +711,72 @@ replicateM cnt0 f =
         | cnt <= 0  = pure []
         | otherwise = liftA2 (:) f (loop (cnt - 1))
 
+-- | @'void' value@ discards or ignores the result of evaluation, such
+-- as the return value of an 'System.IO.IO' action.
+--
+-- ==== __Examples__
+--
+-- Replace the contents of a @'Maybe' 'Int'@ with unit:
+--
+-- >>> void Nothing
+-- Nothing
+-- >>> void (Just 3)
+-- Just ()
+--
+-- Replace the contents of an @'Either' 'Int' 'Int'@ with unit,
+-- resulting in an @'Either' 'Int' '()'@:
+--
+-- >>> void (Left 8675309)
+-- Left 8675309
+-- >>> void (Right 8675309)
+-- Right ()
+--
+-- Replace every element of a list with unit:
+--
+-- >>> void [1,2,3]
+-- [(),(),()]
+--
+-- Replace the second element of a pair with unit:
+--
+-- >>> void (1,2)
+-- (1,())
+--
+-- Discard the result of an 'System.IO.IO' action:
+--
+-- >>> mapM print [1,2]
+-- 1
+-- 2
+-- [(),()]
+-- >>> void $ mapM print [1,2]
+-- 1
+-- 2
 void :: (Functor f, Suitable f ()) => f a -> f ()
 void = (<$) ()
-
--- | One or more.
-some :: (Alternative f, Suitable f [a]) => f a -> f [a]
-some v = some_v
-  where
-    many_v = some_v <|> pure []
-    some_v = liftA2 (:) v many_v
-
--- | Zero or more.
-many :: (Alternative f, Suitable f [a]) => f a -> f [a]
-many v = many_v
-  where
-    many_v = some_v <|> pure []
-    some_v = liftA2 (:) v many_v
 
 --------------------------------------------------------------------------------
 -- syntax
 --------------------------------------------------------------------------------
 
+-- | Function to which the @if ... then ... else@ syntax desugars to
 ifThenElse :: Bool -> a -> a -> a
-ifThenElse True  t _ = t
+ifThenElse True t _ = t
 ifThenElse False _ f = f
 
+-- | Called on a failed pattern match in a monadic bind. To be avoided.
 fail :: String -> a
 fail = error
 
-(>>) :: (Applicative f, Suitable f b) => f a -> f b -> f b
+-- | Sequence two actions, discarding the result of the first. Alias for
+-- @('*>')@.
+(>>)
+    :: (Applicative f, Suitable f b)
+    => f a -> f b -> f b
 (>>) = (*>)
 
-return :: (Applicative f, Suitable f a) => a -> f a
+-- | Alias for 'pure'.
+return
+    :: (Applicative f, Suitable f a)
+    => a -> f a
 return = pure
 
 --------------------------------------------------------------------------------
@@ -602,22 +811,22 @@ instance Functor Maybe where
     (<$) = (Prelude.<$)
 
 instance Applicative Maybe where
-  liftA = liftAP
-  (<*>) = (Prelude.<*>)
-  (*>) = (Prelude.*>)
-  (<*) = (Prelude.<*)
-  pure = Prelude.pure
+    liftA = liftAP
+    (<*>) = (Prelude.<*>)
+    (*>) = (Prelude.*>)
+    (<*) = (Prelude.<*)
+    pure = Prelude.pure
 
 instance Alternative Maybe where
-  empty = Control.Applicative.empty
-  (<|>) = (Control.Applicative.<|>)
+    empty = Control.Applicative.empty
+    (<|>) = (Control.Applicative.<|>)
 
 instance Monad Maybe where
-  (>>=) = (Prelude.>>=)
+    (>>=) = (Prelude.>>=)
 
 instance Traversable Maybe where
-  traverse _ Nothing = pure Nothing
-  traverse f (Just x) = fmap Just (f x)
+    traverse _ Nothing = pure Nothing
+    traverse f (Just x) = fmap Just (f x)
 
 instance Functor IO where
     type Suitable IO a = ()
@@ -714,12 +923,12 @@ instance Monoid a => Monad ((,) a) where
     (>>=) = (Prelude.>>=)
 
 instance Traversable ((,) a) where
-  traverse f (x,y) = fmap ((,) x) (f y)
+    traverse f (x,y) = fmap ((,) x) (f y)
 
 instance Functor IntMap where
-  type Suitable IntMap a = ()
-  fmap = Prelude.fmap
-  (<$) = (Prelude.<$)
+    type Suitable IntMap a = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
 
 instance Functor Seq where
   type Suitable Seq a = ()
@@ -734,11 +943,11 @@ instance Applicative Seq where
     pure = Prelude.pure
 
 instance Alternative Seq where
-  empty = Control.Applicative.empty
-  (<|>) = (Control.Applicative.<|>)
+    empty = Control.Applicative.empty
+    (<|>) = (Control.Applicative.<|>)
 
 instance Monad Seq where
-  (>>=) = (Prelude.>>=)
+    (>>=) = (Prelude.>>=)
 
 instance Functor ((->) a) where
     type Suitable ((->) a) b = ()
