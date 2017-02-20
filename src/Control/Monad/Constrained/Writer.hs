@@ -9,8 +9,19 @@
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE ViewPatterns           #-}
 
-
-module Control.Monad.Constrained.Writer where
+module Control.Monad.Constrained.Writer
+  (MonadWriter(..)
+  ,WriterT
+  ,pattern WriterT
+  ,runWriterT
+  ,execWriterT
+  ,execWriter
+  ,runWriter
+  ,listen
+  ,pass
+  ,evalWriterT
+  ,evalWriter
+  )where
 
 import           GHC.Exts
 
@@ -149,8 +160,8 @@ instance Monad m => Monad (WriterT s m) where
   WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))
   join (WriterT_ xs) = WriterT_ (xs >>= unWriterT)
 
-first_  :: (Functor f, Suitable f (b, c)) => (a -> f b) -> (a, c) -> f (b, c)
-first_  f (x,y) = fmap (flip (,) y) (f x)
+-- first_  :: (Functor f, Suitable f (b, c)) => (a -> f b) -> (a, c) -> f (b, c)
+-- first_  f (x,y) = fmap (flip (,) y) (f x)
 
 -- | Run a writer computation in the underlying monad.
 runWriterT

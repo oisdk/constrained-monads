@@ -5,14 +5,18 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
-module Control.Monad.Constrained.Error where
+module Control.Monad.Constrained.Error
+  (MonadError(..)
+  ,ExceptT(..)
+  ,Except)
+  where
 
 import           GHC.Exts
 
 import           Control.Monad.Constrained
 import           Control.Monad.Constrained.Trans
 
-import qualified Control.Monad.Trans.Except       as Except
+import           Control.Monad.Trans.Except hiding (catchE)
 
 import qualified Control.Monad.Trans.Identity     as Identity
 import qualified Control.Monad.Trans.Maybe        as Maybe
@@ -32,21 +36,21 @@ instance MonadError e (Either e) where
     catchError (Left x) f = f x
     catchError r _ = r
 
-instance Monad m => MonadError e (Except.ExceptT e m) where
-    type SuitableError (Except.ExceptT e m) a = Suitable m (Either e a)
-    throwError = Except.ExceptT . pure . Left
+instance Monad m => MonadError e (ExceptT e m) where
+    type SuitableError (ExceptT e m) a = Suitable m (Either e a)
+    throwError = ExceptT . pure . Left
     catchError = catchE
 
 catchE
     :: (Monad m, Suitable m (Either e' a))
-    => Except.ExceptT e m a
-    -> (e -> Except.ExceptT e' m a)
-    -> Except.ExceptT e' m a
+    => ExceptT e m a
+    -> (e -> ExceptT e' m a)
+    -> ExceptT e' m a
 catchE m h =
-    Except.ExceptT $
-    do a <- Except.runExceptT m
+    ExceptT $
+    do a <- runExceptT m
        case a of
-           Left l -> Except.runExceptT (h l)
+           Left l -> runExceptT (h l)
            Right r -> return (Right r)
 {-# INLINE catchE #-}
 

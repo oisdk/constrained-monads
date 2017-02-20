@@ -2,7 +2,9 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Control.Monad.Constrained.Trans where
+module Control.Monad.Constrained.Trans
+  (MonadTrans(..))
+  where
 
 import           Control.Monad.Constrained
 

@@ -5,14 +5,18 @@
 {-# LANGUAGE RebindableSyntax       #-}
 {-# LANGUAGE TypeFamilies           #-}
 
-module Control.Monad.Constrained.Reader where
+module Control.Monad.Constrained.Reader
+  (MonadReader(..)
+  ,ReaderT(..)
+  ,Reader
+  )where
 
 import           GHC.Exts
 
 import           Control.Monad.Constrained
 import           Control.Monad.Constrained.Trans
 
-import qualified Control.Monad.Trans.Reader       as Reader
+import           Control.Monad.Trans.Reader hiding (reader, ask, local)
 
 import qualified Control.Monad.Trans.State.Lazy   as State.Lazy
 import qualified Control.Monad.Trans.State.Strict as State.Strict
@@ -42,11 +46,11 @@ instance MonadReader r ((->) r) where
     local f m = m . f
     reader = id
 
-instance Monad m => MonadReader r (Reader.ReaderT r m) where
-    type ReaderSuitable (Reader.ReaderT r m) a = Suitable m a
-    ask = Reader.ReaderT pure
-    local = Reader.local
-    reader f = Reader.ReaderT (pure . f)
+instance Monad m => MonadReader r (ReaderT r m) where
+    type ReaderSuitable (ReaderT r m) a = Suitable m a
+    ask = ReaderT pure
+    local = local
+    reader f = ReaderT (pure . f)
 
 instance MonadReader r' m =>
          MonadReader r' (Cont.ContT r m) where

@@ -7,7 +7,13 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 
-module Control.Monad.Constrained.State where
+module Control.Monad.Constrained.State
+  (MonadState(..)
+  ,StateT(..)
+  ,gets
+  ,modify
+  ,modify'
+  )where
 
 import           GHC.Exts
 
@@ -15,7 +21,7 @@ import           Control.Monad.Constrained
 import           Control.Monad.Constrained.Trans
 
 import qualified Control.Monad.Trans.State.Lazy   as State.Lazy
-import qualified Control.Monad.Trans.State.Strict as State.Strict
+import           Control.Monad.Trans.State.Strict hiding (state, get, modify, gets, modify')
 
 import qualified Control.Monad.Trans.Cont         as Cont
 import qualified Control.Monad.Trans.Identity     as Identity
@@ -65,9 +71,9 @@ modify' f =
               let s' = f s
               in s' `seq` ((), s'))
 
-instance Monad m => MonadState s (State.Strict.StateT s m) where
-  type StateSuitable (State.Strict.StateT s m) a = Suitable m (a, s)
-  state f = State.Strict.StateT (pure . f)
+instance Monad m => MonadState s (StateT s m) where
+  type StateSuitable (StateT s m) a = Suitable m (a, s)
+  state f = StateT (pure . f)
 
 instance Monad m => MonadState s (State.Lazy.StateT s m) where
   type StateSuitable (State.Lazy.StateT s m) a = Suitable m (a, s)

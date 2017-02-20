@@ -3,7 +3,9 @@
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Control.Monad.Constrained.IO where
+module Control.Monad.Constrained.IO
+  (MonadIO(..))
+  where
 
 import           Control.Monad.Constrained
 import           Control.Monad.Constrained.Trans
