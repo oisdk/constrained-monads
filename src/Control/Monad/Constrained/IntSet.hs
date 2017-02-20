@@ -29,7 +29,10 @@ import           Control.Monad.Constrained hiding (filter)
 import qualified Data.IntSet               as IntSet
 
 import           Data.Foldable             (Foldable (..))
+import           Data.Functor.Classes
 import           Data.Semigroup
+
+import           Control.Arrow             (first)
 
 data IntSet a where
         IntSet :: IntSet.IntSet -> IntSet Int
@@ -147,3 +150,23 @@ maxView (IntSet xs) = (fmap.fmap) IntSet (IntSet.maxView xs)
 minView :: IntSet a -> Maybe (a, IntSet a)
 minView (IntSet xs) = (fmap.fmap) IntSet (IntSet.minView xs)
 
+instance Show1 IntSet where
+  liftShowsPrec _ _ d (IntSet xs) = showsPrec d xs
+
+instance Show a => Show (IntSet a) where
+  showsPrec = showsPrec1
+
+instance (a ~ Int) => Read (IntSet a) where
+  readsPrec n = (fmap.first) IntSet . readsPrec n
+
+instance Eq1 IntSet where
+  liftEq _ (IntSet xs) (IntSet ys) = xs == ys
+
+instance Eq a => Eq (IntSet a) where
+  (==) = eq1
+
+instance Ord1 IntSet where
+  liftCompare _ (IntSet xs) (IntSet ys) = compare xs ys
+
+instance Ord a => Ord (IntSet a) where
+  compare = compare1
