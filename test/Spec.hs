@@ -14,6 +14,8 @@ import           Test.QuickCheck
 
 import           Data.Proxy
 
+import qualified Control.Applicative
+
 instance Functor Gen where
   type Suitable Gen a = ()
   fmap = Prelude.fmap
@@ -29,6 +31,91 @@ fmapIsSame
     :: (Functor f, Prelude.Functor f, Suitable f b, Eq (f b), Show (f b))
     => Blind (a -> b) -> f a -> Property
 fmapIsSame (Blind f) x = fmap f x === Prelude.fmap f x
+
+replaceIsSame
+    :: (Functor f, Prelude.Functor f, Suitable f a, Eq (f a), Show (f a))
+    => f b -> a -> Property
+replaceIsSame xs x = (x <$ xs) === (x Prelude.<$ xs)
+
+pureIsSame
+    :: (Applicative f
+       ,Prelude.Applicative f
+       ,Suitable f a
+       ,Eq (f a)
+       ,Show (f a))
+    => Proxy f -> a -> Property
+pureIsSame (_ :: Proxy f) (x :: a) = (pure x :: f a) === Prelude.pure x
+
+seqRightIsSame
+    :: (Applicative f
+       ,Prelude.Applicative f
+       ,Suitable f b
+       ,Eq (f b)
+       ,Show (f b))
+    => f a -> f b -> Property
+seqRightIsSame xs ys = (xs *> ys) === (xs Prelude.*> ys)
+
+seqLeftIsSame
+    :: (Applicative f
+       ,Prelude.Applicative f
+       ,Suitable f b
+       ,Eq (f b)
+       ,Show (f b))
+    => f b -> f a -> Property
+seqLeftIsSame xs ys = (xs <* ys) === (xs Prelude.<* ys)
+
+applyIsSame
+    :: (Applicative f
+       ,Prelude.Applicative f
+       ,Suitable f b
+       ,Eq (f b)
+       ,Show (f b))
+    => Blind (f (a -> b)) -> f a -> Property
+applyIsSame (Blind fs) xs = (fs <*> xs) === (fs Prelude.<*> xs)
+
+liftA2IsSame
+    :: (Applicative f
+       ,Prelude.Applicative f
+       ,Suitable f c
+       ,Eq (f c)
+       ,Show (f c))
+    => Blind (a -> b -> c) -> f a -> f b -> Property
+liftA2IsSame (Blind f) xs ys =
+    liftA2 f xs ys === Control.Applicative.liftA2 f xs ys
+
+bindIsSame
+    :: (Monad f, Prelude.Monad f, Suitable f b, Show (f b), Eq (f b))
+    => f a -> Blind (a -> f b) -> Property
+bindIsSame xs (Blind f) = (xs >>= f) === (xs Prelude.>>= f)
+
+checkSame
+    :: (Monad f
+       ,Prelude.Monad f
+       ,Show (f b)
+       ,Show (f c)
+       -- ,Eq (f c)
+       ,CoArbitrary c
+       ,Arbitrary (f c)
+       -- ,Eq (f b)
+       ,Arbitrary (f a)
+       ,Arbitrary (f (b -> a))
+       ,CoArbitrary b
+       ,Arbitrary a
+       ,Arbitrary (f b)
+       ,Suitable f a
+       ,Eq (f a)
+       ,Show (f a)
+       ,Show a)
+    => Proxy f -> Proxy a -> Proxy b -> Proxy c -> IO ()
+checkSame (_ :: Proxy f) (_ :: Proxy a) (_ :: Proxy b) (_ :: Proxy c) = do
+  quickCheck (fmapIsSame @ f @ a @ b)
+  quickCheck (replaceIsSame @ f @ a @ b)
+  quickCheck (pureIsSame (Proxy :: Proxy f) :: a -> Property)
+  quickCheck (seqRightIsSame @ f @ a @ b)
+  quickCheck (seqLeftIsSame @ f @ a @ b)
+  quickCheck (applyIsSame @ f @ a @ b)
+  quickCheck (liftA2IsSame @ f @ a @ b @ c)
+  quickCheck (bindIsSame @ f @ a @ b)
 
 {-# ANN fmapLaw "HLint: ignore Functor law" #-}
 fmapLaw
@@ -99,7 +186,7 @@ monadLawThree m (Blind k) (Blind h) =
 
 main :: IO ()
 main = do
-  quickCheck (fmapIsSame @ [] @ Int @ Int)
+  checkSame (Proxy :: Proxy []) (Proxy :: Proxy Integer) (Proxy :: Proxy Word) (Proxy :: Proxy Int)
   quickCheck (fmapLaw @ [] @ Int)
   quickCheck (appIdLaw @ [] @ Int)
   quickCheck (appCompLaw @ [] @ Integer @ Int @ Word)
