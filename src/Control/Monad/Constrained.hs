@@ -398,6 +398,14 @@ class Functor f =>
             (\(r :- s :- t :- u :- v :- w :- x :- y :- z :- Nil) ->
                   f r s t u v w x y z)
             (rs :* ss :* ts :* us :* vs :* ws :* xs :* ys :* zs :* NilA)
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
+    {-# INLINE liftA4 #-}
+    {-# INLINE liftA5 #-}
+    {-# INLINE liftA6 #-}
+    {-# INLINE liftA7 #-}
+    {-# INLINE liftA8 #-}
+    {-# INLINE liftA9 #-}
 
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
@@ -408,6 +416,116 @@ liftAP :: (Prelude.Applicative f) => (Vect xs -> b) -> (AppVect f xs -> f b)
 liftAP f NilA = Prelude.pure (f Nil)
 liftAP f (x :* NilA) = Prelude.fmap (f . (:-Nil)) x
 liftAP f (x :* xs) =  ((f .) . (:-)) Prelude.<$> x Prelude.<*> liftAP id xs
+
+{-# INLINE liftA2P #-}
+{-# INLINE liftA3P #-}
+{-# INLINE liftA4P #-}
+{-# INLINE liftA5P #-}
+{-# INLINE liftA6P #-}
+{-# INLINE liftA7P #-}
+{-# INLINE liftA8P #-}
+{-# INLINE liftA9P #-}
+-- | Definitions for the various lifts using only "Prelude" functions.
+liftA2P
+    :: (Prelude.Applicative f)
+    => (a -> b -> c) -> f a -> f b -> f c
+liftA2P f x y = f Prelude.<$> x Prelude.<*> y
+
+liftA3P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
+liftA3P f xs ys zs = f Prelude.<$> xs Prelude.<*> ys Prelude.<*> zs
+
+liftA4P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e) -> f a -> f b -> f c -> f d -> f e
+liftA4P f ws xs ys zs =
+    f Prelude.<$> ws Prelude.<*> xs Prelude.<*> ys Prelude.<*> zs
+
+liftA5P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e -> g)
+    -> f a
+    -> f b
+    -> f c
+    -> f d
+    -> f e
+    -> f g
+liftA5P f vs ws xs ys zs =
+    f Prelude.<$> vs Prelude.<*> ws Prelude.<*> xs Prelude.<*> ys Prelude.<*>
+    zs
+
+liftA6P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e -> g -> h)
+    -> f a
+    -> f b
+    -> f c
+    -> f d
+    -> f e
+    -> f g
+    -> f h
+liftA6P f us vs ws xs ys zs =
+    f Prelude.<$> us Prelude.<*> vs Prelude.<*> ws Prelude.<*> xs Prelude.<*>
+    ys Prelude.<*>
+    zs
+
+liftA7P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e -> g -> h -> i)
+    -> f a
+    -> f b
+    -> f c
+    -> f d
+    -> f e
+    -> f g
+    -> f h
+    -> f i
+liftA7P f ts us vs ws xs ys zs =
+    f Prelude.<$> ts Prelude.<*> us Prelude.<*> vs Prelude.<*> ws Prelude.<*>
+    xs Prelude.<*>
+    ys Prelude.<*>
+    zs
+
+liftA8P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e -> g -> h -> i -> j)
+    -> f a
+    -> f b
+    -> f c
+    -> f d
+    -> f e
+    -> f g
+    -> f h
+    -> f i
+    -> f j
+liftA8P f ss ts us vs ws xs ys zs =
+    f Prelude.<$> ss Prelude.<*> ts Prelude.<*> us Prelude.<*> vs Prelude.<*>
+    ws Prelude.<*>
+    xs Prelude.<*>
+    ys Prelude.<*>
+    zs
+
+liftA9P
+    :: Prelude.Applicative f
+    => (a -> b -> c -> d -> e -> g -> h -> i -> j -> k)
+    -> f a
+    -> f b
+    -> f c
+    -> f d
+    -> f e
+    -> f g
+    -> f h
+    -> f i
+    -> f j
+    -> f k
+liftA9P f rs ss ts us vs ws xs ys zs =
+    f Prelude.<$> rs Prelude.<*> ss Prelude.<*> ts Prelude.<*> us Prelude.<*>
+    vs Prelude.<*>
+    ws Prelude.<*>
+    xs Prelude.<*>
+    ys Prelude.<*>
+    zs
 
 -- | A definition of 'liftA' which uses 's @('>>=')@.
 liftAM :: (Monad f, Suitable f b) => (Vect xs -> b) -> (AppVect f xs -> f b)
@@ -795,11 +913,19 @@ instance Functor [] where
     (<$) = (Prelude.<$)
 
 instance Applicative [] where
-  liftA = liftAP
-  (<*>) = (Prelude.<*>)
-  (*>) = (Prelude.*>)
-  (<*) = (Prelude.<*)
-  pure = Prelude.pure
+    liftA = liftAP
+    (<*>) = (Prelude.<*>)
+    (*>) = (Prelude.*>)
+    (<*) = (Prelude.<*)
+    pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Alternative [] where
   empty = []
@@ -822,6 +948,14 @@ instance Applicative Maybe where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Alternative Maybe where
     empty = Control.Applicative.empty
@@ -845,6 +979,14 @@ instance Applicative IO where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Alternative IO where
     empty = Control.Applicative.empty
@@ -864,12 +1006,20 @@ instance Applicative Identity where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monad Identity where
     (>>=) = (Prelude.>>=)
 
 instance Traversable Identity where
-  traverse f (Identity x) = fmap Identity (f x)
+    traverse f (Identity x) = fmap Identity (f x)
 
 instance Functor (Either e) where
     type Suitable (Either e) a = ()
@@ -882,6 +1032,14 @@ instance Applicative (Either a) where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monad (Either a) where
     (>>=) = (Prelude.>>=)
@@ -905,8 +1063,8 @@ instance Monad Set where
     (>>=) = flip foldMap
 
 instance Alternative Set where
-  empty = Set.empty
-  (<|>) = Set.union
+    empty = Set.empty
+    (<|>) = Set.union
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
@@ -924,6 +1082,14 @@ instance Monoid a => Applicative ((,) a) where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monoid a => Monad ((,) a) where
     (>>=) = (Prelude.>>=)
@@ -947,6 +1113,14 @@ instance Applicative Seq where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Alternative Seq where
     empty = Control.Applicative.empty
@@ -966,6 +1140,14 @@ instance Applicative Tree where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monad Tree where
     (>>=) = (Prelude.>>=)
@@ -981,6 +1163,14 @@ instance Applicative ((->) a) where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monad ((->) a) where
   (>>=) = (Prelude.>>=)
@@ -996,6 +1186,14 @@ instance Applicative (ContT r m) where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Monad (ContT r m) where
     (>>=) = (Prelude.>>=)
@@ -1011,6 +1209,14 @@ instance Applicative Control.Applicative.ZipList where
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
+    liftA2 = liftA2P
+    liftA3 = liftA3P
+    liftA4 = liftA4P
+    liftA5 = liftA5P
+    liftA6 = liftA6P
+    liftA7 = liftA7P
+    liftA8 = liftA8P
+    liftA9 = liftA9P
 
 instance Functor m => Functor (Strict.StateT s m) where
     type Suitable (Strict.StateT s m) a = Suitable m (a, s)
@@ -1146,8 +1352,8 @@ instance Monad m => Applicative (MaybeT m) where
   pure x = MaybeT (pure (Just x))
   MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
   liftA = liftAM
-  MaybeT xs *> MaybeT ys = MaybeT (xs *> ys)
-  MaybeT xs <* MaybeT ys = MaybeT (xs <* ys)
+  MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
+  MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
 
 instance Monad m => Monad (MaybeT m) where
   MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
