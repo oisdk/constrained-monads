@@ -166,7 +166,7 @@ instance Monad m =>
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
-    liftA = liftAM
+    liftA' = liftAM
 
 instance Monad m => Monad (WriterT s m) where
   WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))
