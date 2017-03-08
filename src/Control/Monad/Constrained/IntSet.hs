@@ -77,7 +77,7 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    liftA' = liftAM
+    liftA = liftAM
 
 instance Alternative IntSet where
     empty = mempty

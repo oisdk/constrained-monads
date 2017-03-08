@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE RankNTypes           #-}
 
 -- | A module for constrained monads. This module is intended to be imported
 -- with the @-XRebindableSyntax@ extension turned on: everything from the
@@ -23,7 +25,7 @@ module Control.Monad.Constrained
   ,Traversable(..)
   ,
    -- * Horrible type-level stuff
-  AppVect(..)
+  AppVectS(..)
   ,liftAP
   ,liftAM
   ,
@@ -89,21 +91,16 @@ import           Control.Monad.Trans.State.Strict (state, runState)
 -- Type-level shenanigans
 --------------------------------------------------------------------------------
 
--- | A heterogeneous list, for storing the arguments to 'liftA'. (There /has/ to
--- be a better way to do this).
-infixl 5 :-
-data Snoc a = Nil | Snoc a :- a
+-- | A heterogeneous snoc list, for storing the arguments to 'liftA',
+-- wrapped in their applicatives.
+infixl 5 :>
+data AppVectS f xs where
+  NilS :: AppVectS f '[]
+  (:>) :: AppVectS f xs -> f x -> AppVectS f (x ': xs)
 
--- | Another heterogeneous list, for storing the arguments to 'liftA', wrapped
--- in their applicatives.
-infixl 5 :*
-data AppVect f xs where
-  NilA :: AppVect f 'Nil
-  (:*) :: AppVect f xs -> f x -> AppVect f (xs ':- x)
-
-type family FunType (xs :: Snoc *) (y :: *) :: * where
-  FunType 'Nil y = y
-  FunType (xs ':- x) y = FunType xs (x -> y)
+type family FunTypeS (xs :: [*]) (y :: *) :: * where
+  FunTypeS '[] y = y
+  FunTypeS (x ': xs) y = FunTypeS xs (x -> y)
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -209,13 +206,13 @@ class Functor f  where
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 class Functor f =>
       Applicative f  where
-    {-# MINIMAL liftA', pure #-}
+    {-# MINIMAL liftA #-}
 
     -- | Lift a value.
     pure
         :: Suitable f a
         => a -> f a
-    pure x = liftA x NilA
+    pure x = liftA x NilS
     {-# INLINE pure #-}
 
     infixl 4 <*>
@@ -224,7 +221,7 @@ class Functor f =>
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    fs <*> xs = liftA ($) (NilA :* fs :* xs)
+    fs <*> xs = liftA ($) (NilS :> fs :> xs)
     {-# INLINE (<*>) #-}
 
     infixl 4 *>
@@ -278,7 +275,7 @@ class Functor f =>
     -- than @('<*>')@.
     --
     -- It would also be preferable to avoid the two intermediate structures
-    -- ('Vect', 'AppVect', etc). Ideally GHC would optimize them away, but
+    -- ('Vect', 'AppVectS', etc). Ideally GHC would optimize them away, but
     -- it seems unlikely.
     --
     -- Utility definitions of this function are provided: if your 'Applicative'
@@ -289,24 +286,19 @@ class Functor f =>
     -- in terms of @('>>=')@, which is what 'liftAM' does.
     liftA
         :: Suitable f a
-        => FunType xs a -> AppVect f xs -> f a
-    liftA = liftA' id
-
-    liftA'
-        :: Suitable f b
-        => (a -> b) -> FunType xs a -> AppVect f xs -> f b
+        => FunTypeS xs a -> AppVectS f xs -> f a
 
     liftA2
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys =
-        liftA f (NilA :* xs :* ys)
+        liftA f (NilS :> xs :> ys)
 
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs =
-        liftA f (NilA :* xs :* ys :* zs)
+        liftA f (NilS :> xs :> ys :> zs)
 
     {-# INLINE liftA2 #-}
     {-# INLINE liftA3 #-}
@@ -315,18 +307,18 @@ class Functor f =>
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
--- | A definition of 'liftA' which uses the "Prelude"'s @('Prelude.<*>')@.
-liftAP :: Prelude.Applicative f => FunType xs a -> AppVect f xs -> f a
-liftAP f NilA = Prelude.pure f
-liftAP f (NilA :* xs) = Prelude.fmap f xs
-liftAP f (ys :* xs) = liftAP f ys Prelude.<*> xs
-{-# INLINABLE liftAP #-}
+liftAM :: (Monad f, Suitable f a) => FunTypeS xs a -> AppVectS f xs -> f a
+liftAM = go pure where
+  go :: (Suitable f b, Monad f) => (a -> f b) -> FunTypeS xs a -> AppVectS f xs -> f b
+  go f g NilS = f g
+  go f g (xs :> x) = go (\c -> x >>= f . c) g xs
 
-liftAP' :: Prelude.Applicative f => (a -> b) -> FunType xs a -> AppVect f xs -> f b
-liftAP' f g NilA = Prelude.pure (f g)
-liftAP' f g (NilA :* xs) = Prelude.fmap (f . g) xs
-liftAP' f g (ys :* xs) = liftAP' (f.) g ys Prelude.<*> xs
-{-# INLINABLE liftAP' #-}
+-- | A definition of 'liftA' which uses the "Prelude"'s @('Prelude.<*>')@.
+liftAP :: Prelude.Applicative f => FunTypeS xs a -> AppVectS f xs -> f a
+liftAP f NilS = Prelude.pure f
+liftAP f (NilS :> xs) = Prelude.fmap f xs
+liftAP f (ys :> xs) = liftAP f ys Prelude.<*> xs
+{-# INLINABLE liftAP #-}
 
 {-# INLINE liftA2P #-}
 {-# INLINE liftA3P #-}
@@ -723,7 +715,7 @@ instance Functor [] where
 
 instance Applicative [] where
     liftA = liftAP
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -748,7 +740,6 @@ instance Functor Maybe where
 
 instance Applicative Maybe where
     liftA = liftAP
-    liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -773,7 +764,6 @@ instance Functor IO where
     (<$) = (Prelude.<$)
 
 instance Applicative IO where
-    liftA' = liftAP'
     liftA = liftAP
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -796,7 +786,6 @@ instance Functor Identity where
 
 instance Applicative Identity where
     liftA = liftAP
-    liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -817,7 +806,6 @@ instance Functor (Either e) where
 
 instance Applicative (Either a) where
     liftA = liftAP
-    liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -836,16 +824,12 @@ instance Functor Set where
     fmap = Set.map
     x <$ xs = if null xs then Set.empty else Set.singleton x
 
-liftAM :: (Monad f, Suitable f b) => (a -> b) -> FunType xs a -> AppVect f xs -> f b
-liftAM f g NilA = pure (f g)
-liftAM f g (xs :* x) = x >>= \y -> liftAM (\h -> f (h y)) g xs
-
 instance Applicative Set where
     pure = Set.singleton
     fs <*> xs = foldMap (`Set.map` xs) fs
     xs *> ys = if null xs then Set.empty else ys
     xs <* ys = if null ys then Set.empty else xs
-    liftA' = liftAM
+    liftA = liftAM
 
 instance Monad Set where
     (>>=) = flip foldMap
@@ -866,7 +850,6 @@ instance Functor ((,) a) where
 
 instance Monoid a => Applicative ((,) a) where
     liftA = liftAP
-    liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -891,7 +874,7 @@ instance Functor Seq where
     (<$) = (Prelude.<$)
 
 instance Applicative Seq where
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     liftA = liftAP
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -914,7 +897,7 @@ instance Functor Tree where
 
 instance Applicative Tree where
     liftA = liftAP
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -932,7 +915,7 @@ instance Functor ((->) a) where
 
 instance Applicative ((->) a) where
     liftA = liftAP
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -949,7 +932,7 @@ instance Functor (ContT r m) where
     (<$) = (Prelude.<$)
 
 instance Applicative (ContT r m) where
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     liftA = liftAP
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -968,7 +951,7 @@ instance Functor Control.Applicative.ZipList where
 
 instance Applicative Control.Applicative.ZipList where
     liftA = liftAP
-    liftA' = liftAP'
+    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1007,7 +990,7 @@ instance Monad m =>
             (x,s') <- xs s
             (_,s'') <- ys s'
             pure (x,s'')
-    liftA' = liftAM
+    liftA = liftAM
 
 instance (Monad m, Alternative m) => Alternative (Strict.StateT s m) where
     empty = Strict.StateT (const empty)
@@ -1052,7 +1035,7 @@ instance (Monad m) =>
             ~(x,s') <- xs s
             ~(_,s'') <- ys s'
             pure (x,s'')
-    liftA' = liftAM
+    liftA = liftAM
 
 instance (Monad m, Alternative m) => Alternative (StateT s m) where
     empty = StateT (const empty)
@@ -1078,15 +1061,10 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
     liftA f ys = ReaderT $ \r -> liftA f (tr r ys) where
-      tr :: Functor m => r -> AppVect (ReaderT r m) xs -> AppVect m xs
-      tr _ NilA = NilA
-      tr r (NilA :* xs) = NilA :* runReaderT xs r
-      tr r (xs :* x) = tr r xs :* runReaderT x r
-    liftA' f g ys = ReaderT $ \r -> liftA' f g (tr r ys) where
-      tr :: Functor m => r -> AppVect (ReaderT r m) xs -> AppVect m xs
-      tr _ NilA = NilA
-      tr r (NilA :* xs) = NilA :* runReaderT xs r
-      tr r (xs :* x) = tr r xs :* runReaderT x r
+      tr :: r -> AppVectS (ReaderT r m) xs -> AppVectS m xs
+      tr _ NilS = NilS
+      tr r (NilS :> xs) = NilS :> runReaderT xs r
+      tr r (xs :> x) = tr r xs :> runReaderT x r
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1114,7 +1092,7 @@ instance Functor m => Functor (MaybeT m) where
 instance Monad m => Applicative (MaybeT m) where
   pure x = MaybeT (pure (Just x))
   MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
-  liftA' = liftAM
+  liftA = liftAM
   MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
   MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
 
@@ -1136,7 +1114,7 @@ instance Monad m =>
          Applicative (ExceptT e m) where
     pure x = ExceptT (pure (Right x))
     ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
-    liftA' = liftAM
+    liftA = liftAM
     ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
     ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
 
@@ -1164,13 +1142,10 @@ instance Applicative m =>
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
     liftA f =
-        (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
+        (coerce :: (AppVectS f xs -> f b) -> (AppVectS (IdentityT f) xs -> IdentityT f b))
             (liftA f)
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
-    liftA' f g =
-        (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
-            (liftA' f g)
 
 instance Monad m =>
          Monad (IdentityT m) where
