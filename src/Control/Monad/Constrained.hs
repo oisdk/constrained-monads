@@ -25,7 +25,7 @@ module Control.Monad.Constrained
   ,Traversable(..)
   ,
    -- * Horrible type-level stuff
-  AppVectS(..)
+  AppVect(..)
   ,liftAP
   ,liftAM
   ,
@@ -94,13 +94,13 @@ import           Control.Monad.Trans.State.Strict (state, runState)
 -- | A heterogeneous snoc list, for storing the arguments to 'liftA',
 -- wrapped in their applicatives.
 infixl 5 :>
-data AppVectS f xs where
-  NilS :: AppVectS f '[]
-  (:>) :: AppVectS f xs -> f x -> AppVectS f (x ': xs)
+data AppVect f xs where
+  Nil :: AppVect f '[]
+  (:>) :: AppVect f xs -> f x -> AppVect f (x ': xs)
 
-type family FunTypeS (xs :: [*]) (y :: *) :: * where
-  FunTypeS '[] y = y
-  FunTypeS (x ': xs) y = FunTypeS xs (x -> y)
+type family FunType (xs :: [*]) (y :: *) :: * where
+  FunType '[] y = y
+  FunType (x ': xs) y = FunType xs (x -> y)
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -212,7 +212,7 @@ class Functor f =>
     pure
         :: Suitable f a
         => a -> f a
-    pure x = liftA x NilS
+    pure x = liftA x Nil
     {-# INLINE pure #-}
 
     infixl 4 <*>
@@ -221,7 +221,7 @@ class Functor f =>
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    fs <*> xs = liftA ($) (NilS :> fs :> xs)
+    fs <*> xs = liftA ($) (Nil :> fs :> xs)
     {-# INLINE (<*>) #-}
 
     infixl 4 *>
@@ -274,9 +274,8 @@ class Functor f =>
     -- to get do-notation to desugar to using the 'liftA' functions, rather
     -- than @('<*>')@.
     --
-    -- It would also be preferable to avoid the two intermediate structures
-    -- ('Vect', 'AppVectS', etc). Ideally GHC would optimize them away, but
-    -- it seems unlikely.
+    -- From some preliminary performance testing, it seems that this approach
+    -- has /no/ performance overhead.
     --
     -- Utility definitions of this function are provided: if your 'Applicative'
     -- is a @Prelude.'Prelude.Applicative'@, 'liftA' can be defined in terms of
@@ -286,19 +285,19 @@ class Functor f =>
     -- in terms of @('>>=')@, which is what 'liftAM' does.
     liftA
         :: Suitable f a
-        => FunTypeS xs a -> AppVectS f xs -> f a
+        => FunType xs a -> AppVect f xs -> f a
 
     liftA2
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys =
-        liftA f (NilS :> xs :> ys)
+        liftA f (Nil :> xs :> ys)
 
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs =
-        liftA f (NilS :> xs :> ys :> zs)
+        liftA f (Nil :> xs :> ys :> zs)
 
     {-# INLINE liftA2 #-}
     {-# INLINE liftA3 #-}
@@ -307,16 +306,16 @@ class Functor f =>
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
-liftAM :: (Monad f, Suitable f a) => FunTypeS xs a -> AppVectS f xs -> f a
+liftAM :: (Monad f, Suitable f a) => FunType xs a -> AppVect f xs -> f a
 liftAM = go pure where
-  go :: (Suitable f b, Monad f) => (a -> f b) -> FunTypeS xs a -> AppVectS f xs -> f b
-  go f g NilS = f g
+  go :: (Suitable f b, Monad f) => (a -> f b) -> FunType xs a -> AppVect f xs -> f b
+  go f g Nil = f g
   go f g (xs :> x) = go (\c -> x >>= f . c) g xs
 
 -- | A definition of 'liftA' which uses the "Prelude"'s @('Prelude.<*>')@.
-liftAP :: Prelude.Applicative f => FunTypeS xs a -> AppVectS f xs -> f a
-liftAP f NilS = Prelude.pure f
-liftAP f (NilS :> xs) = Prelude.fmap f xs
+liftAP :: Prelude.Applicative f => FunType xs a -> AppVect f xs -> f a
+liftAP f Nil = Prelude.pure f
+liftAP f (Nil :> xs) = Prelude.fmap f xs
 liftAP f (ys :> xs) = liftAP f ys Prelude.<*> xs
 {-# INLINABLE liftAP #-}
 
@@ -715,7 +714,6 @@ instance Functor [] where
 
 instance Applicative [] where
     liftA = liftAP
-    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -874,7 +872,6 @@ instance Functor Seq where
     (<$) = (Prelude.<$)
 
 instance Applicative Seq where
-    -- liftA' = liftAP'
     liftA = liftAP
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -897,7 +894,6 @@ instance Functor Tree where
 
 instance Applicative Tree where
     liftA = liftAP
-    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -915,7 +911,6 @@ instance Functor ((->) a) where
 
 instance Applicative ((->) a) where
     liftA = liftAP
-    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -932,7 +927,6 @@ instance Functor (ContT r m) where
     (<$) = (Prelude.<$)
 
 instance Applicative (ContT r m) where
-    -- liftA' = liftAP'
     liftA = liftAP
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -951,7 +945,6 @@ instance Functor Control.Applicative.ZipList where
 
 instance Applicative Control.Applicative.ZipList where
     liftA = liftAP
-    -- liftA' = liftAP'
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1061,9 +1054,9 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
     liftA f ys = ReaderT $ \r -> liftA f (tr r ys) where
-      tr :: r -> AppVectS (ReaderT r m) xs -> AppVectS m xs
-      tr _ NilS = NilS
-      tr r (NilS :> xs) = NilS :> runReaderT xs r
+      tr :: r -> AppVect (ReaderT r m) xs -> AppVect m xs
+      tr _ Nil = Nil
+      tr r (Nil :> xs) = Nil :> runReaderT xs r
       tr r (xs :> x) = tr r xs :> runReaderT x r
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
@@ -1142,7 +1135,7 @@ instance Applicative m =>
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
     liftA f =
-        (coerce :: (AppVectS f xs -> f b) -> (AppVectS (IdentityT f) xs -> IdentityT f b))
+        (coerce :: (AppVect f xs -> f b) -> (AppVect (IdentityT f) xs -> IdentityT f b))
             (liftA f)
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
