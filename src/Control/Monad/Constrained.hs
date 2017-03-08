@@ -149,7 +149,8 @@ class Functor f  where
     --
     -- @instance 'Functor' 'Set' where
     --    type 'Suitable' 'Set' a = 'Ord' a
-    --    'fmap' = 'Set.map'@
+    --    'fmap' = Set.'Set.map'
+    --    x '<$' xs = if Set.'Set.null' xs then Set.'Set.empty' else Set.'Set.singleton' x@
     type Suitable f a :: Constraint
 
     -- | Maps a function over a functor
