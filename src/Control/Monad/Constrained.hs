@@ -26,6 +26,7 @@ module Control.Monad.Constrained
   ,
    -- * Horrible type-level stuff
   AppVect(..)
+  ,FunType
   ,liftAP
   ,liftAM
   ,
@@ -98,6 +99,7 @@ data AppVect f xs where
   Nil :: AppVect f '[]
   (:>) :: AppVect f xs -> f x -> AppVect f (x ': xs)
 
+-- | The type of a function for 'liftA'.
 type family FunType (xs :: [*]) (y :: *) :: * where
   FunType '[] y = y
   FunType (x ': xs) y = FunType xs (x -> y)
@@ -221,7 +223,7 @@ class Functor f =>
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    fs <*> xs = liftA ($) (Nil :> fs :> xs)
+    (<*>) = liftA2 ($)
     {-# INLINE (<*>) #-}
 
     infixl 4 *>
@@ -306,6 +308,7 @@ class Functor f =>
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
+-- | A definition of 'liftA' that uses monadic operations.
 liftAM :: (Monad f, Suitable f a) => FunType xs a -> AppVect f xs -> f a
 liftAM = go pure where
   go :: (Suitable f b, Monad f) => (a -> f b) -> FunType xs a -> AppVect f xs -> f b
