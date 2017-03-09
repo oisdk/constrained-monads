@@ -27,6 +27,19 @@ instance Applicative (Free f) where
 lift :: f a -> Free f a
 lift = Ap (Pure id id) id
 
-lower :: forall f a c. Free f a -> (forall xs. Constrained.FunType xs a -> Constrained.AppVect f xs -> f c) -> f c
+lower
+    :: forall f a c.
+       Free f a
+    -> (forall xs. FunType xs a -> AppVect f xs -> f c)
+    -> f c
 lower (Pure c x) f = f (c x) Nil
-lower (Ap fs c x :: Free f a) f = lower (fmap (.c) fs) (\ft av -> f ft (av :> x))
+lower (Ap fs c x :: Free f a) f =
+    lower
+        (fmap (. c) fs)
+        (\ft av ->
+              f ft (av :> x))
+
+lowerConstrained
+    :: (Constrained.Applicative f, Suitable f a)
+    => Free f a -> f a
+lowerConstrained x = lower x liftA
