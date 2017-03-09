@@ -33,7 +33,7 @@ instance Functor Gen where
   (<$) = (Prelude.<$)
 
 instance Applicative Gen where
-  liftA = liftAP
+  lower = lowerP
 
 instance Monad Gen where
   (>>=) = (Prelude.>>=)

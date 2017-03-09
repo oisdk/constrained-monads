@@ -5,7 +5,7 @@
 module Control.Monad.Constrained.Free where
 
 import qualified Control.Monad.Constrained as Constrained
-import Control.Monad.Constrained (AppVect(..), Suitable, liftA, FunType)
+import Control.Monad.Constrained (Suitable)
 
 data Free f a where
   Pure :: (a -> b) -> a -> Free f b
@@ -26,16 +26,16 @@ lift = Ap (Pure id id) id
 lower
     :: forall f a c.
        Free f a
-    -> (forall xs. FunType xs a -> AppVect f xs -> f c)
+    -> (Constrained.Free f a -> f c)
     -> f c
-lower (Pure c x) f = f (c x) Nil
+lower (Pure c x) f = f (Constrained.Pure (c x))
 lower (Ap fs c x :: Free f a) f =
     lower
         (fmap (. c) fs)
-        (\ft av ->
-              f ft (av :> x))
+        (\av ->
+              f (av Constrained.:> x))
 
 lowerConstrained
     :: (Constrained.Applicative f, Suitable f a)
     => Free f a -> f a
-lowerConstrained x = lower x liftA
+lowerConstrained x = lower x Constrained.lower
