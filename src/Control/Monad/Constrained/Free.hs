@@ -1,10 +1,6 @@
-{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE TypeOperators    #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE RankNTypes     #-}
-{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE RankNTypes          #-}
 
 module Control.Monad.Constrained.Free where
 
