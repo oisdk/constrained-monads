@@ -1,51 +1,32 @@
 {-# LANGUAGE GADTs            #-}
-{-# LANGUAGE KindSignatures   #-}
-{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE RankNTypes     #-}
+{-# LANGUAGE ConstraintKinds   #-}
 
 module Control.Monad.Constrained.Free where
 
-import Control.Monad.Constrained hiding ((<$>), (<*>), pure, fmap)
 import qualified Control.Monad.Constrained as Constrained
+import Control.Monad.Constrained (AppVect(..), Suitable, liftA, FunType)
 
-infixl 5 :>|
-data FreeAppVect :: (* -> *) -> [*] -> * where
-        NilAppl :: FreeAppVect f '[]
-        (:>|) ::
-            Suitable f x =>
-            FreeAppVect f xs -> App f x -> FreeAppVect f (x ': xs)
+data Free f a where
+  Pure :: (a -> b) -> a -> Free f b
+  Ap :: Free f (a -> b) -> (c -> a) -> f c -> Free f b
 
-data App :: (* -> *) -> * -> * where
-        Pure :: a -> App f a
-        Appl :: FunType xs a -> FreeAppVect f xs -> App f a
-        Lift :: Suitable f a => f a -> App f a
+instance Functor (Free f) where
+  fmap f (Pure c x) = Pure (f . c) x
+  fmap f (Ap tx c ay) = Ap ((f .) <$> tx) c ay
 
-infixl 4 <*>
-(<*>) :: Suitable f a => App f (a -> b) -> App f a -> App f b
-Pure f <*> x = Appl f (NilAppl :>| x)
-Appl fs xs <*> ys = Appl fs (xs :>| ys)
-Lift f <*> x = Appl ($) (NilAppl :>| Lift f :>| x)
+instance Applicative (Free f) where
+  pure = Pure id
+  Pure c f <*> tx = fmap (c f) tx
+  Ap tx c ay <*> tz = Ap (flip <$> tx <*> tz) c ay
 
-infixl 4 <$>
-(<$>) :: Suitable f a => (a -> b) -> App f a -> App f b
-f <$> x = Pure f <*> x
+lift :: f a -> Free f a
+lift = Ap (Pure id id) id
 
-fmap :: Suitable f a => (a -> b) -> App f a -> App f b
-fmap = (<$>)
-
-pure :: a -> App f a
-pure = Pure
-
-lower
-    :: (Applicative f, Suitable f a)
-    => App f a -> f a
-lower (Pure x) = Constrained.pure x
-lower (Lift x) = x
-lower (Appl fs xs) = liftA fs (lowerVect xs)
-  where
-    lowerVect
-        :: Applicative f
-        => FreeAppVect f xs -> AppVect f xs
-    lowerVect NilAppl = Nil
-    lowerVect (ys :>| y) = lowerVect ys :> lower y
+lower :: forall f a c. Free f a -> (forall xs. Constrained.FunType xs a -> Constrained.AppVect f xs -> f c) -> f c
+lower (Pure c x) f = f (c x) Nil
+lower (Ap fs c x :: Free f a) f = lower (fmap (.c) fs) (\ft av -> f ft (av :> x))
