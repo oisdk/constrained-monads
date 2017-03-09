@@ -91,12 +91,21 @@ import           Control.Monad.Trans.State.Strict (state, runState)
 -- Type-level shenanigans
 --------------------------------------------------------------------------------
 
--- | A free applicative. Applicatives operations are defined in terms of
+-- | A free applicative. Applicative operations are defined in terms of
 -- /interpretations/ of this.
 infixl 5 :>
 data Free f a where
   Pure :: a -> Free f a
   (:>) :: Free f (a -> b) -> f a -> Free f b
+
+instance Prelude.Functor (Free f) where
+  fmap f (Pure a) = Pure (f a)
+  fmap f (x :> y) = ((f .) Prelude.<$> x) :> y
+
+instance Prelude.Applicative (Free f) where
+  pure = Pure
+  Pure f <*> y = Prelude.fmap f y
+  (x :> y) <*> z = (flip Prelude.<$> x Prelude.<*> z) :> y
 
 --------------------------------------------------------------------------------
 -- Standard classes
