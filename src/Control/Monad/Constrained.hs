@@ -23,6 +23,7 @@ module Control.Monad.Constrained
   ,Monad(..)
   ,Alternative(..)
   ,Traversable(..)
+  ,MonadFail(..)
   ,
    -- * Horrible type-level stuff
   Ap(..)
@@ -50,7 +51,6 @@ module Control.Monad.Constrained
   ,
    -- * Syntax
    ifThenElse
-  ,fail
   ,(>>)
   ,return
   ,module RestPrelude)
@@ -379,6 +379,14 @@ class Applicative f =>
     (>>=)
         :: Suitable f b
         => f a -> (a -> f b) -> f b
+
+-- | See
+-- <https://hackage.haskell.org/package/base-4.9.1.0/docs/Control-Monad-Fail.html here>
+-- for more details.
+class Monad f => MonadFail f where
+  -- | Called when a pattern match fails in do-notation.
+  fail :: Suitable f a => String -> f a
+
 -- | A monoid on applicative functors.
 --
 -- If defined, 'some' and 'many' should be the least solutions
@@ -697,10 +705,6 @@ ifThenElse :: Bool -> a -> a -> a
 ifThenElse True t _ = t
 ifThenElse False _ f = f
 
--- | Called on a failed pattern match in a monadic bind. To be avoided.
-fail :: String -> a
-fail = error
-
 infixl 1 >>
 -- | Sequence two actions, discarding the result of the first. Alias for
 -- @('*>')@.
@@ -738,10 +742,13 @@ instance Alternative [] where
   (<|>) = (++)
 
 instance Monad [] where
-  (>>=) = (Prelude.>>=)
+    (>>=) = (Prelude.>>=)
+
+instance MonadFail [] where
+    fail _ = []
 
 instance Traversable [] where
-  traverse f = foldr (liftA2 (:) . f) (pure [])
+    traverse f = foldr (liftA2 (:) . f) (pure [])
 
 instance Functor Maybe where
     type Suitable Maybe a = ()
@@ -763,6 +770,9 @@ instance Alternative Maybe where
 
 instance Monad Maybe where
     (>>=) = (Prelude.>>=)
+
+instance MonadFail Maybe where
+    fail _ = Nothing
 
 instance Traversable Maybe where
     traverse _ Nothing = pure Nothing
@@ -788,6 +798,9 @@ instance Alternative IO where
 
 instance Monad IO where
     (>>=) = (Prelude.>>=)
+
+instance MonadFail IO where
+    fail = Prelude.fail
 
 instance Functor Identity where
     type Suitable Identity a = ()
@@ -826,8 +839,12 @@ instance Applicative (Either a) where
 instance Monad (Either a) where
     (>>=) = (Prelude.>>=)
 
+instance IsString a =>
+         MonadFail (Either a) where
+    fail = Left . fromString
+
 instance Traversable (Either a) where
-  traverse f = either (pure . Left) (fmap Right . f)
+    traverse f = either (pure . Left) (fmap Right . f)
 
 instance Functor Set where
     type Suitable Set a = Ord a
@@ -843,6 +860,9 @@ instance Applicative Set where
 
 instance Monad Set where
     (>>=) = flip foldMap
+
+instance MonadFail Set where
+    fail _ = Set.empty
 
 instance Alternative Set where
     empty = Set.empty
@@ -898,6 +918,9 @@ instance Alternative Seq where
 
 instance Monad Seq where
     (>>=) = (Prelude.>>=)
+
+instance MonadFail Seq where
+    fail _ = empty
 
 instance Functor Tree where
     type Suitable Tree a = ()
@@ -1078,6 +1101,10 @@ instance (Alternative m) => Alternative (ReaderT r m) where
     m <|> n = ReaderT $ \ r -> runReaderT m r <|> runReaderT n r
     {-# INLINE (<|>) #-}
 
+instance MonadFail m =>
+         MonadFail (ReaderT r m) where
+    fail = ReaderT . const . fail
+
 instance (Monad m) => Monad (ReaderT r m) where
     m >>= k  = ReaderT $ \ r -> do
         a <- runReaderT m r
@@ -1088,20 +1115,27 @@ liftReaderT :: m a -> ReaderT r m a
 liftReaderT m = ReaderT (const m)
 {-# INLINE liftReaderT #-}
 
-instance Functor m => Functor (MaybeT m) where
-  type Suitable (MaybeT m) a = (Suitable m (Maybe a), Suitable m a)
-  fmap f (MaybeT xs) = MaybeT ((fmap.fmap) f xs)
-  x <$ MaybeT xs = MaybeT (fmap (x<$) xs)
+instance Functor m =>
+         Functor (MaybeT m) where
+    type Suitable (MaybeT m) a = (Suitable m (Maybe a), Suitable m a)
+    fmap f (MaybeT xs) = MaybeT ((fmap . fmap) f xs)
+    x <$ MaybeT xs = MaybeT (fmap (x <$) xs)
 
-instance Monad m => Applicative (MaybeT m) where
-  pure x = MaybeT (pure (Just x))
-  MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
-  lower = lowerM
-  MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
-  MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
+instance Monad m =>
+         Applicative (MaybeT m) where
+    pure x = MaybeT (pure (Just x))
+    MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
+    lower = lowerM
+    MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
+    MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
 
-instance Monad m => Monad (MaybeT m) where
-  MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
+instance Monad m =>
+         Monad (MaybeT m) where
+    MaybeT x >>= f = MaybeT (x >>= maybe (pure Nothing) (runMaybeT . f))
+
+instance Monad m =>
+         MonadFail (MaybeT m) where
+    fail _ = empty
 
 instance Monad m =>
          Alternative (MaybeT m) where
@@ -1121,6 +1155,9 @@ instance Monad m =>
     lower = lowerM
     ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
     ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
+
+instance (Monad m, IsString e) => MonadFail (ExceptT e m) where
+    fail = ExceptT . pure . Left . fromString
 
 instance Monad m => Monad (ExceptT e m) where
   ExceptT xs >>= f = ExceptT (xs >>= either (pure . Left) (runExceptT . f))
@@ -1156,3 +1193,7 @@ instance Monad m =>
     (>>=) =
         (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
+
+instance MonadFail m =>
+         MonadFail (IdentityT m) where
+    fail = IdentityT . fail

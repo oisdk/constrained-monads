@@ -17,25 +17,14 @@ import           Prelude                          hiding (Monad (..))
 import qualified Prelude
 
 import           Control.Monad.Trans.Cont         (ContT)
-import           Control.Monad.Trans.Except       (ExceptT)
+import           Control.Monad.Trans.Except       (ExceptT(..))
 import           Control.Monad.Trans.Identity     (IdentityT (..))
-import           Control.Monad.Trans.Maybe        (MaybeT)
+import           Control.Monad.Trans.Maybe        (MaybeT(..))
 import           Control.Monad.Trans.Reader       (ReaderT (..))
 import           Control.Monad.Trans.State        (StateT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT)
 import           Data.Functor.Identity            (Identity)
 import           Data.Sequence                    (Seq)
-
-class Applicative f =>
-      Monad f  where
-    type Suitable f a :: Constraint
-    infixl 1 >>=
-    (>>=)
-        :: (Suitable f a, Suitable f b)
-        => f a -> (a -> f b) -> f b
-    join
-        :: Suitable f a
-        => f (f a) -> f a
 
 -- | This class is for types which have no constraints on their applicative
 -- operations, but /do/ have constraints on the monadic operations.
@@ -47,6 +36,24 @@ class Applicative f =>
 -- and then lifting the result. In practice, this allows you to write code on
 -- on the @Ap@ type, using applicative do notation, and have it be interpreted
 -- correctly.
+class Applicative f =>
+      Monad f  where
+    type Suitable f a :: Constraint
+    infixl 1 >>=
+    (>>=)
+        :: (Suitable f a, Suitable f b)
+        => f a -> (a -> f b) -> f b
+    join
+        :: Suitable f a
+        => f (f a) -> f a
+
+-- | See
+-- <https://hackage.haskell.org/package/base-4.9.1.0/docs/Control-Monad-Fail.html here>
+-- for more details.
+class Monad f => MonadFail f where
+  -- | Called when a pattern match fails in do-notation.
+  fail :: Suitable f a => String -> f a
+
 instance Constrained.Monad f =>
          Monad (Ap f) where
     type Suitable (Ap f) a = Constrained.Suitable f a
@@ -63,12 +70,9 @@ instance Constrained.Monad f =>
                 (\c ->
                       x Constrained.>>= (f . c))
                 xs
-
+-- | An alias for 'pure'
 return :: Applicative f => a -> f a
 return = pure
-
-fail :: String -> a
-fail = error
 
 -- | Function to which the @if ... then ... else@ syntax desugars to
 ifThenElse :: Bool -> a -> a -> a
@@ -88,15 +92,24 @@ instance Monad [] where
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
 
+instance MonadFail [] where
+    fail _ = []
+
 instance Monad Maybe where
     type Suitable Maybe a = ()
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
 
+instance MonadFail Maybe where
+    fail _ = Nothing
+
 instance Monad IO where
     type Suitable IO a = ()
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
+
+instance MonadFail IO where
+    fail = Prelude.fail
 
 instance Monad Identity where
     type Suitable Identity a = ()
@@ -108,6 +121,10 @@ instance Monad (Either e) where
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
 
+instance IsString a =>
+         MonadFail (Either a) where
+    fail = Left . fromString
+
 instance Monoid m =>
          Monad ((,) m) where
     type Suitable ((,) m) a = ()
@@ -118,6 +135,9 @@ instance Monad Seq where
     type Suitable Seq a = ()
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
+
+instance MonadFail Seq where
+    fail _ = Constrained.empty
 
 instance Monad ((->) b) where
     type Suitable ((->) b) a = ()
@@ -156,6 +176,10 @@ instance Monad m =>
                   join (flip runReaderT r <$> x r))
     {-# INLINE join #-}
 
+instance MonadFail m =>
+         MonadFail (ReaderT r m) where
+    fail = ReaderT . const . fail
+
 instance Prelude.Monad m =>
          Monad (MaybeT m) where
     type Suitable (MaybeT m) a = ()
@@ -163,10 +187,17 @@ instance Prelude.Monad m =>
     join = Control.Monad.join
 
 instance Prelude.Monad m =>
+         MonadFail (MaybeT m) where
+    fail _ = Control.Monad.mzero
+
+instance Prelude.Monad m =>
          Monad (ExceptT e m) where
     type Suitable (ExceptT e m) a = ()
     (>>=) = (Prelude.>>=)
     join = Control.Monad.join
+
+instance (Prelude.Monad m, IsString e) => MonadFail (ExceptT e m) where
+    fail = ExceptT . pure . Left . fromString
 
 instance Monad m =>
          Monad (IdentityT m) where
@@ -175,3 +206,7 @@ instance Monad m =>
         (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
     join (IdentityT x) = IdentityT (join (fmap runIdentityT x))
+
+instance MonadFail m =>
+         MonadFail (IdentityT m) where
+    fail = IdentityT . fail
