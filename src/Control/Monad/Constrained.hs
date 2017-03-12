@@ -25,9 +25,10 @@ module Control.Monad.Constrained
   ,Traversable(..)
   ,
    -- * Horrible type-level stuff
-  Free(..)
+  Ap(..)
   ,lowerP
   ,lowerM
+  ,liftAp
   ,
    -- * Useful functions
    guard
@@ -93,19 +94,21 @@ import           Control.Monad.Trans.State.Strict (state, runState)
 
 -- | A free applicative. Applicative operations are defined in terms of
 -- /interpretations/ of this.
-infixl 5 :>
-data Free f a where
-  Pure :: a -> Free f a
-  (:>) :: Free f (a -> b) -> f a -> Free f b
+data Ap f a where
+  Pure :: a -> Ap f a
+  Ap :: Ap f (a -> b) -> f a -> Ap f b
 
-instance Prelude.Functor (Free f) where
+instance Prelude.Functor (Ap f) where
   fmap f (Pure a) = Pure (f a)
-  fmap f (x :> y) = ((f .) Prelude.<$> x) :> y
+  fmap f (Ap x y) = Ap ((f .) Prelude.<$> x) y
 
-instance Prelude.Applicative (Free f) where
+instance Prelude.Applicative (Ap f) where
   pure = Pure
   Pure f <*> y = Prelude.fmap f y
-  (x :> y) <*> z = (flip Prelude.<$> x Prelude.<*> z) :> y
+  Ap x y <*> z = Ap (flip Prelude.<$> x Prelude.<*> z) y
+
+liftAp :: f a -> Ap f a
+liftAp = Ap (Pure id)
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -291,39 +294,40 @@ class Functor f =>
     -- in terms of @('>>=')@, which is what 'lowerM' does.
     lower
         :: Suitable f a
-        => Free f a -> f a
+        => Ap f a -> f a
 
     liftA2
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys =
-        lower (Pure f :> xs :> ys)
+        lower (Ap (Ap (Pure f) xs) ys)
 
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs =
-        lower (Pure f :> xs :> ys :> zs)
+        lower (Ap (Ap (Ap (Pure f) xs) ys) zs)
 
     {-# INLINE liftA2 #-}
     {-# INLINE liftA3 #-}
 
+infixl 4 <**>
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
 -- | A definition of 'lower' that uses monadic operations.
-lowerM :: (Monad f, Suitable f a) => Free f a -> f a
+lowerM :: (Monad f, Suitable f a) => Ap f a -> f a
 lowerM = go pure where
-  go :: (Suitable f b, Monad f) => (a -> f b) -> Free f a -> f b
+  go :: (Suitable f b, Monad f) => (a -> f b) -> Ap f a -> f b
   go f (Pure x) = f x
-  go f (xs :> x) = go (\c -> x >>= f . c) xs
+  go f (Ap xs x) = go (\c -> x >>= f . c) xs
 
 -- | A definition of 'lower' which uses the "Prelude"'s @('Prelude.<*>')@.
-lowerP :: Prelude.Applicative f => Free f a -> f a
+lowerP :: Prelude.Applicative f => Ap f a -> f a
 lowerP (Pure x) = Prelude.pure x
-lowerP (Pure f :> xs) = Prelude.fmap f xs
-lowerP (ys :> xs) = lowerP ys Prelude.<*> xs
+lowerP (Ap (Pure f) xs) = Prelude.fmap f xs
+lowerP (Ap ys xs) = lowerP ys Prelude.<*> xs
 {-# INLINABLE lowerP #-}
 
 {-# INLINE liftA2P #-}
@@ -697,6 +701,7 @@ ifThenElse False _ f = f
 fail :: String -> a
 fail = error
 
+infixl 1 >>
 -- | Sequence two actions, discarding the result of the first. Alias for
 -- @('*>')@.
 (>>)
@@ -1061,9 +1066,9 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
     lower ys = ReaderT $ \r -> lower (tr r ys) where
-      tr :: r -> Free (ReaderT r m) xs -> Free m xs
+      tr :: r -> Ap (ReaderT r m) xs -> Ap m xs
       tr _ (Pure x) = Pure x
-      tr r (xs :> x) = tr r xs :> runReaderT x r
+      tr r (Ap xs x) = Ap (tr r xs) (runReaderT x r)
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1141,7 +1146,7 @@ instance Applicative m =>
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
     lower =
-        (coerce :: (Free f xs -> f b) -> (Free (IdentityT f) xs -> IdentityT f b))
+        (coerce :: (Ap f xs -> f b) -> (Ap (IdentityT f) xs -> IdentityT f b))
             lower
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
