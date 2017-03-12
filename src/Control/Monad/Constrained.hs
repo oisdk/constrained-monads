@@ -48,6 +48,7 @@ module Control.Monad.Constrained
   ,void
   ,forever
   ,for_
+  ,join
   ,
    -- * Syntax
    ifThenElse
@@ -695,6 +696,10 @@ replicateM cnt0 f =
 -- 2
 void :: (Functor f, Suitable f ()) => f a -> f ()
 void = (<$) ()
+
+-- | Collapse one monadic layer.
+join :: (Monad f, Suitable f a) => f (f a) -> f a
+join x = x >>= id
 
 --------------------------------------------------------------------------------
 -- syntax

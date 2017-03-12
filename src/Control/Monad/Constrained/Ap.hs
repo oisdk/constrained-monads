@@ -42,6 +42,22 @@ import           Data.Sequence                    (Seq)
 -- and then lifting the result. In practice, this allows you to write code on
 -- on the @Ap@ type, using applicative do notation, and have it be interpreted
 -- correctly.
+--
+-- For instance, take the following expression:
+--
+-- @example = do
+--   x <- pure 1
+--   y <- pure 2
+--   pure (x + y)@
+--
+-- With the standard constrained monad module, you can instantiate that at
+-- any type which is a constrained monad. 'Data.Set.Set', for instance. However,
+-- if @-XApplicativeDo@ is turned on, you will get the error:
+--
+-- @No instance for ('Ord' ('Integer' -> 'Data.Set.Set' 'Integer'))@
+--
+-- The solution is to use @'Ap' 'Data.Set.Set'@ instead, which has the same
+-- constraints on expressions built with '<*>' as those built with '>>='.
 class Applicative f =>
       Monad f  where
     type Suitable f a :: Constraint
