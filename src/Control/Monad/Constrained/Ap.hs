@@ -5,7 +5,13 @@
 
 -- | This module allows the use of the Applicative Do extension with
 -- constrained monads.
-module Control.Monad.Constrained.Ap where
+module Control.Monad.Constrained.Ap
+  (Monad(..)
+  ,MonadFail(..)
+  ,return
+  ,ifThenElse
+  ,(>>))
+  where
 
 import           Control.Monad.Constrained        (Ap (..), liftAp, lower)
 import qualified Control.Monad.Constrained        as Constrained
