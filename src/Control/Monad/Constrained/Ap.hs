@@ -34,6 +34,7 @@ import           Control.Monad.Trans.State        (StateT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT)
 import           Data.Functor.Identity            (Identity)
 import           Data.Sequence                    (Seq)
+import           Data.Set (Set)
 
 -- | This class is for types which have no constraints on their applicative
 -- operations, but /do/ have constraints on the monadic operations.
@@ -83,6 +84,8 @@ instance Constrained.Monad f =>
          Monad (Ap f) where
     type Suitable (Ap f) a = Constrained.Suitable f a
     (>>=) ap f = liftAp (lower ap Constrained.>>= (lower . f))
+    {-# SPECIALISE (>>=) :: (Ord b, Ord a) => Ap Set a -> (a -> Ap Set b) -> Ap Set b #-}
+    {-# INLINE (>>=) #-}
     join = liftAp . go id . fmap lower
       where
         go
@@ -95,9 +98,13 @@ instance Constrained.Monad f =>
                 (\c ->
                       x Constrained.>>= (f . c))
                 xs
+    {-# INLINE join #-}
+    {-# SPECIALISE join :: Ord a => Ap Set (Ap Set a) -> Ap Set a #-}
+
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a
 return = pure
+{-# INLINE return #-}
 
 -- | Function to which the @if ... then ... else@ syntax desugars to
 ifThenElse :: Bool -> a -> a -> a
@@ -111,6 +118,7 @@ infixl 1 >>
     :: Applicative f
     => f a -> f b -> f b
 (>>) = (*>)
+{-# INLINE (>>) #-}
 
 instance Monad [] where
     type Suitable [] a = ()

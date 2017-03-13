@@ -96,6 +96,8 @@ import           Control.Arrow (first)
 import           Data.Tuple
 import           Control.Monad.Trans.State.Strict (state, runState)
 
+-- import Control.Applicative.Free
+
 --------------------------------------------------------------------------------
 -- Type-level shenanigans
 --------------------------------------------------------------------------------
