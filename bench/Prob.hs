@@ -27,7 +27,7 @@ instance Num s =>
       where
         go :: forall a s. Num s => Ap (Prob s) a -> [(a, s)]
         go (Pure x) = [(x, 1)]
-        go (Ap fs xs) =
+        go (Ap xs fs) =
             [ (f x, fp * xp)
             | (!f,!fp) <- go fs
             , (!x,!xp) <- (Map.toList . runProb) xs ]

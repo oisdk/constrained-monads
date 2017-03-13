@@ -86,18 +86,16 @@ instance Constrained.Monad f =>
     (>>=) ap f = liftAp (lower ap Constrained.>>= (lower . f))
     {-# SPECIALISE (>>=) :: (Ord b, Ord a) => Ap Set a -> (a -> Ap Set b) -> Ap Set b #-}
     {-# INLINE (>>=) #-}
-    join = liftAp . go id . fmap lower
+    join = liftAp . go lower
       where
         go
             :: forall a f b.
                (Constrained.Suitable f b, Constrained.Monad f)
             => (a -> f b) -> Ap f a -> f b
         go c (Pure x) = c x
-        go f (Ap xs x) =
-            go
-                (\c ->
-                      x Constrained.>>= (f . c))
-                xs
+        go f (Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
+        {-# SPECIALISE go :: Ord b => (a -> Set b) -> Ap Set a -> Set b #-}
+        {-# INLINE go #-}
     {-# INLINE join #-}
     {-# SPECIALISE join :: Ord a => Ap Set (Ap Set a) -> Ap Set a #-}
 

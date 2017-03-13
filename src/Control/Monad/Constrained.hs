@@ -27,10 +27,10 @@ module Control.Monad.Constrained
   ,
    -- * Horrible type-level stuff
   Ap(..)
-  ,lowerP
+  ,retractAp
   ,lowerM
   ,liftAp
-  ,hoist
+  ,hoistAp
   ,
    -- * Useful functions
    guard
@@ -96,38 +96,7 @@ import           Control.Arrow (first)
 import           Data.Tuple
 import           Control.Monad.Trans.State.Strict (state, runState)
 
--- import Control.Applicative.Free
-
---------------------------------------------------------------------------------
--- Type-level shenanigans
---------------------------------------------------------------------------------
-
--- | A free applicative. Applicative operations are defined in terms of
--- /interpretations/ of this.
-data Ap f a where
-  Pure :: a -> Ap f a
-  Ap :: Ap f (a -> b) -> f a -> Ap f b
-
-instance Prelude.Functor (Ap f) where
-  fmap f (Pure a) = Pure (f a)
-  fmap f (Ap x y) = Ap (Prelude.fmap (f .) x) y
-  {-# INLINE fmap #-}
-
-instance Prelude.Applicative (Ap f) where
-  pure = Pure
-  {-# INLINE pure #-}
-  Pure f <*> y = Prelude.fmap f y
-  Ap x y <*> z = Ap (flip Prelude.<$> x Prelude.<*> z) y
-  {-# INLINE (<*>) #-}
-
-liftAp :: f a -> Ap f a
-liftAp = Ap (Pure id)
-{-# INLINE liftAp #-}
-
-hoist :: (forall t. f t -> g t) -> Ap f a -> Ap g a
-hoist _ (Pure x) = Pure x
-hoist u (Ap f x) = Ap (hoist u f) (u x)
-{-# INLINE hoist #-}
+import           Control.Applicative.Free
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -307,7 +276,7 @@ class Functor f =>
     --
     -- Utility definitions of this function are provided: if your 'Applicative'
     -- is a @Prelude.'Prelude.Applicative'@, 'lower' can be defined in terms of
-    -- @('<*>')@. 'lowerP' does exactly this.
+    -- @('<*>')@. 'retractAp' does exactly this.
     --
     -- Alternatively, if your applicative is a 'Monad', 'lower' can be defined
     -- in terms of @('>>=')@, which is what 'lowerM' does.
@@ -319,13 +288,13 @@ class Functor f =>
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys =
-        lower (Ap (Ap (Pure f) xs) ys)
+        lower (Ap ys (Ap xs (Pure f)))
 
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs =
-        lower (Ap (Ap (Ap (Pure f) xs) ys) zs)
+        lower (Ap zs (Ap ys (Ap xs (Pure f))))
 
     {-# INLINE liftA2 #-}
     {-# INLINE liftA3 #-}
@@ -341,16 +310,9 @@ lowerM :: (Monad f, Suitable f a) => Ap f a -> f a
 lowerM = go pure where
   go :: (Suitable f b, Monad f) => (a -> f b) -> Ap f a -> f b
   go f (Pure x) = f x
-  go f (Ap xs x) = go (\c -> x >>= f . c) xs
+  go f (Ap x xs) = go (\c -> x >>= f . c) xs
   {-# INLINE go #-}
 {-# INLINE lowerM #-}
-
--- | A definition of 'lower' which uses the "Prelude"'s @('Prelude.<*>')@.
-lowerP :: Prelude.Applicative f => Ap f a -> f a
-lowerP (Pure x) = Prelude.pure x
-lowerP (Ap (Pure f) xs) = Prelude.fmap f xs
-lowerP (Ap ys xs) = lowerP ys Prelude.<*> xs
-{-# INLINABLE lowerP #-}
 
 {-# INLINE liftA2P #-}
 {-# INLINE liftA3P #-}
@@ -759,7 +721,7 @@ instance Functor [] where
     {-# INLINE (<$) #-}
 
 instance Applicative [] where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -794,7 +756,7 @@ instance Functor Maybe where
     (<$) = (Prelude.<$)
 
 instance Applicative Maybe where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -822,7 +784,7 @@ instance Functor IO where
     (<$) = (Prelude.<$)
 
 instance Applicative IO where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -846,7 +808,7 @@ instance Functor Identity where
     (<$) = (Prelude.<$)
 
 instance Applicative Identity where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -866,7 +828,7 @@ instance Functor (Either e) where
     (<$) = (Prelude.<$)
 
 instance Applicative (Either a) where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -899,7 +861,7 @@ instance Applicative Set where
     lower xs = fromBuilder (go xs) where
       go :: forall a. Ap Set a -> Builder a
       go (Pure !x) c = c x
-      go (Ap f !x) c = go f (\fa fb -> Set.foldl' (\a e -> c (fa e) a) fb x)
+      go (Ap !x f) c = go f (\fa fb -> Set.foldl' (\a e -> c (fa e) a) fb x)
       {-# INLINE go #-}
     {-# INLINE lower #-}
 
@@ -940,7 +902,7 @@ instance Functor ((,) a) where
     (<$) = (Prelude.<$)
 
 instance Monoid a => Applicative ((,) a) where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -965,7 +927,7 @@ instance Functor Seq where
     (<$) = (Prelude.<$)
 
 instance Applicative Seq where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -989,7 +951,7 @@ instance Functor Tree where
     (<$) = (Prelude.<$)
 
 instance Applicative Tree where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1013,7 +975,7 @@ instance Functor ((->) a) where
     (<$) = (Prelude.<$)
 
 instance Applicative ((->) a) where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1030,7 +992,7 @@ instance Functor (ContT r m) where
     (<$) = (Prelude.<$)
 
 instance Applicative (ContT r m) where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1047,7 +1009,7 @@ instance Functor Control.Applicative.ZipList where
     (<$) = (Prelude.<$)
 
 instance Applicative Control.Applicative.ZipList where
-    lower = lowerP
+    lower = retractAp
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1159,7 +1121,7 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     lower ys = ReaderT $ \r -> lower (tr r ys) where
       tr :: r -> Ap (ReaderT r m) xs -> Ap m xs
       tr _ (Pure x) = Pure x
-      tr r (Ap xs x) = Ap (tr r xs) (runReaderT x r)
+      tr r (Ap x xs) = Ap (runReaderT x r) (tr r xs)
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1272,7 +1234,7 @@ instance Functor (ST s) where
     (<$) = (Prelude.<$)
 
 instance Applicative (ST s) where
-    lower = lowerP
+    lower = retractAp
 
 instance Monad (ST s) where
     (>>=) = (Prelude.>>=)
@@ -1283,7 +1245,7 @@ instance Functor (Const a) where
     (<$) = (Prelude.<$)
 
 instance Monoid a => Applicative (Const a) where
-    lower = lowerP
+    lower = retractAp
 
 instance (Functor f, Functor g) =>
          Functor (Compose f g) where
@@ -1295,7 +1257,7 @@ instance (Applicative f, Applicative g) =>
   lower = Compose . go (lower . Prelude.fmap lower) where
     go :: forall a b. (Ap f (Ap g a) -> f (g b)) -> Ap (Compose f g) a -> f (g b)
     go f (Pure x) = f (Pure (Pure x))
-    go f (Ap fs (Compose x)) = go (\c -> f $ Control.Applicative.liftA2 Ap c (liftAp x)) fs
+    go f (Ap (Compose x) fs) = go (f . Control.Applicative.liftA2 Ap (liftAp x)) fs
 
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
@@ -1309,7 +1271,7 @@ instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
-    lower x = Pair (lower . hoist fstP $ x) (lower . hoist sndP $ x)
+    lower x = Pair (lower . hoistAp fstP $ x) (lower . hoistAp sndP $ x)
       where
         fstP (Pair a _) = a
         sndP (Pair _ b) = b
