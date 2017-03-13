@@ -10,7 +10,10 @@ module Control.Monad.Constrained.Ap
   ,MonadFail(..)
   ,return
   ,ifThenElse
-  ,(>>))
+  ,(>>)
+  ,liftAp
+  ,lower
+  ,module RestPrelude)
   where
 
 import           Control.Monad.Constrained        (Ap (..), liftAp, lower)
@@ -19,7 +22,7 @@ import qualified Control.Monad.Constrained        as Constrained
 import           GHC.Exts
 
 import qualified Control.Monad
-import           Prelude                          hiding (Monad (..))
+import           Prelude                          as RestPrelude hiding (Monad (..))
 import qualified Prelude
 
 import           Control.Monad.Trans.Cont         (ContT)

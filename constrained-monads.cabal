@@ -1,5 +1,5 @@
 name:                constrained-monads
-version:             0.4.0.0
+version:             0.4.1.0
 synopsis:            Typeclasses and instances for monads with constraints. 
 description:         A library for monads with constraints over the types they contain. This allows set, etc to conform to the monad class. It is structured as a prelude replacement: everything that doesn't conflict with the new definitions of 'Functor', 'Monad', etc is reexported.
                      
@@ -28,6 +28,7 @@ library
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5
                      , transformers >= 0.5
+                     , array >= 0.5
   default-language:    Haskell2010
   ghc-options:         -Wall
 
@@ -47,6 +48,19 @@ test-suite constrained-monads-test
                        -Wall
   default-language:    Haskell2010
 
+benchmark bench
+  default-language:    Haskell2010
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  main-is:             bench.hs
+  other-modules:       MuchAdo
+                     , NoAdo
+  ghc-options:         -O2 -rtsopts -threaded
+
+  build-depends:       base >= 4.8
+                     , constrained-monads >= 0.4.1
+                     , criterion >= 0.6
+                     , containers >= 0.5
 
 
 source-repository head

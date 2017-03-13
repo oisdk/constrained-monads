@@ -30,6 +30,7 @@ module Control.Monad.Constrained
   ,lowerP
   ,lowerM
   ,liftAp
+  ,hoist
   ,
    -- * Useful functions
    guard
@@ -76,6 +77,7 @@ import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import           Data.Tree                        (Tree(..))
+import           Data.Array
 
 import           Control.Monad.Trans.Cont         (ContT)
 import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
@@ -84,6 +86,11 @@ import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Control.Monad.Trans.Reader       (ReaderT (..), mapReaderT)
 import           Control.Monad.Trans.State        (StateT (..))
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT (..))
+import           Control.Monad.ST (ST)
+import           Data.Functor.Const (Const)
+import           Data.Functor.Compose (Compose(..))
+import           Data.Functor.Product (Product(..))
+import           Data.Functor.Sum (Sum(..))
 
 import           Control.Arrow (first)
 import           Data.Tuple
@@ -110,6 +117,10 @@ instance Prelude.Applicative (Ap f) where
 
 liftAp :: f a -> Ap f a
 liftAp = Ap (Pure id)
+
+hoist :: (forall t. f t -> g t) -> Ap f a -> Ap g a
+hoist _ (Pure x) = Pure x
+hoist u (Ap f x) = Ap (hoist u f) (u x)
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -873,6 +884,15 @@ instance Alternative Set where
     empty = Set.empty
     (<|>) = Set.union
 
+instance Functor (Array i) where
+    type Suitable (Array i) a = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
+
+instance Ix i =>
+         Traversable (Array i) where
+    traverse f = lower . Prelude.traverse (liftAp . f)
+
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
     fmap = Prelude.fmap
@@ -943,6 +963,13 @@ instance Applicative Tree where
 
 instance Monad Tree where
     (>>=) = (Prelude.>>=)
+
+instance Traversable Tree where
+    traverse f (Node x ts) =
+        let g = (liftAp . f)
+        in lower
+               (Node Prelude.<$> g x Prelude.<*>
+                Prelude.traverse (Prelude.traverse g) ts)
 
 instance Functor ((->) a) where
     type Suitable ((->) a) b = ()
@@ -1202,3 +1229,66 @@ instance Monad m =>
 instance MonadFail m =>
          MonadFail (IdentityT m) where
     fail = IdentityT . fail
+
+instance Functor (ST s) where
+    type Suitable (ST s) a = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
+
+instance Applicative (ST s) where
+    lower = lowerP
+
+instance Monad (ST s) where
+    (>>=) = (Prelude.>>=)
+
+instance Functor (Const a) where
+    type Suitable (Const a) b = ()
+    fmap = Prelude.fmap
+    (<$) = (Prelude.<$)
+
+instance Monoid a => Applicative (Const a) where
+    lower = lowerP
+
+instance (Functor f, Functor g) =>
+         Functor (Compose f g) where
+    type Suitable (Compose f g) a = (Suitable g a, Suitable f (g a))
+    fmap f (Compose xs) = Compose ((fmap . fmap) f xs)
+
+instance (Applicative f, Applicative g) =>
+         Applicative (Compose f g) where
+  lower = Compose . go (lower . Prelude.fmap lower) where
+    go :: forall a b. (Ap f (Ap g a) -> f (g b)) -> Ap (Compose f g) a -> f (g b)
+    go f (Pure x) = f (Pure (Pure x))
+    go f (Ap fs (Compose x)) = go (\c -> f $ Control.Applicative.liftA2 Ap c (liftAp x)) fs
+
+instance (Alternative f, Applicative g) => Alternative (Compose f g) where
+    empty = Compose empty
+    Compose x <|> Compose y = Compose (x <|> y)
+
+instance (Functor f, Functor g) => Functor (Product f g) where
+    type Suitable (Product f g) a = (Suitable f a, Suitable g a)
+    fmap f (Pair x y) = Pair (fmap f x) (fmap f y)
+
+instance (Applicative f, Applicative g) =>
+         Applicative (Product f g) where
+    pure x = Pair (pure x) (pure x)
+    Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
+    lower x = Pair (lower . hoist fstP $ x) (lower . hoist sndP $ x)
+      where
+        fstP (Pair a _) = a
+        sndP (Pair _ b) = b
+
+instance (Alternative f, Alternative g) => Alternative (Product f g) where
+    empty = Pair empty empty
+    Pair x1 y1 <|> Pair x2 y2 = Pair (x1 <|> x2) (y1 <|> y2)
+
+instance (Monad f, Monad g) => Monad (Product f g) where
+    Pair m n >>= f = Pair (m >>= fstP . f) (n >>= sndP . f)
+      where
+        fstP (Pair a _) = a
+        sndP (Pair _ b) = b
+
+instance (Functor f, Functor g) => Functor (Sum f g) where
+    type Suitable (Sum f g) a = (Suitable f a, Suitable g a)
+    fmap f (InL x) = InL (fmap f x)
+    fmap f (InR y) = InR (fmap f y)
