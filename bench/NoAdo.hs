@@ -1,9 +1,11 @@
 {-# LANGUAGE RebindableSyntax #-}
 
+
 module NoAdo where
 
-import Data.Set
-import Control.Monad.Constrained
+import           Control.Monad.Constrained
+import           Data.Set
+import           Prob
 
 sumThriceNoAdo :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceNoAdo xs ys zs = size $ do
@@ -12,8 +14,21 @@ sumThriceNoAdo xs ys zs = size $ do
   z <- fromList zs
   t <- fromList xs
   u <- fromList ys
-  v <- fromList zs
   a <- fromList [0..x]
   b <- fromList [0..y]
   c <- fromList [0..z]
+  v <- fromList zs
   pure (x + a + y + b + z + c + t + u + v)
+
+diceNoAdo :: Integer -> [Integer] -> Double
+diceNoAdo n die' = probOf n $ do
+  t <- die
+  u <- die
+  w <- die
+  x <- die
+  a <- upTo t
+  v <- upTo u
+  y <- die
+  z <- die
+  pure (a + t + u + x + y + z + v + w)
+  where die = uniform die'

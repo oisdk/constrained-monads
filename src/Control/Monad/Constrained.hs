@@ -108,19 +108,24 @@ data Ap f a where
 
 instance Prelude.Functor (Ap f) where
   fmap f (Pure a) = Pure (f a)
-  fmap f (Ap x y) = Ap ((f .) Prelude.<$> x) y
+  fmap f (Ap x y) = Ap (Prelude.fmap (f .) x) y
+  {-# INLINE fmap #-}
 
 instance Prelude.Applicative (Ap f) where
   pure = Pure
+  {-# INLINE pure #-}
   Pure f <*> y = Prelude.fmap f y
   Ap x y <*> z = Ap (flip Prelude.<$> x Prelude.<*> z) y
+  {-# INLINE (<*>) #-}
 
 liftAp :: f a -> Ap f a
 liftAp = Ap (Pure id)
+{-# INLINE liftAp #-}
 
 hoist :: (forall t. f t -> g t) -> Ap f a -> Ap g a
 hoist _ (Pure x) = Pure x
 hoist u (Ap f x) = Ap (hoist u f) (u x)
+{-# INLINE hoist #-}
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -327,6 +332,7 @@ infixl 4 <**>
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
+{-# INLINE (<**>) #-}
 
 -- | A definition of 'lower' that uses monadic operations.
 lowerM :: (Monad f, Suitable f a) => Ap f a -> f a
@@ -334,6 +340,8 @@ lowerM = go pure where
   go :: (Suitable f b, Monad f) => (a -> f b) -> Ap f a -> f b
   go f (Pure x) = f x
   go f (Ap xs x) = go (\c -> x >>= f . c) xs
+  {-# INLINE go #-}
+{-# INLINE lowerM #-}
 
 -- | A definition of 'lower' which uses the "Prelude"'s @('Prelude.<*>')@.
 lowerP :: Prelude.Applicative f => Ap f a -> f a
@@ -569,6 +577,7 @@ infixl 4 <$>
 --
 (<$>) :: (Functor f, Suitable f b) => (a -> b) -> f a -> f b
 (<$>) = fmap
+{-# INLINE (<$>) #-}
 
 infixr 1 =<<, <=<
 -- | A flipped version of '>>='
@@ -728,6 +737,7 @@ infixl 1 >>
     :: (Applicative f, Suitable f b)
     => f a -> f b -> f b
 (>>) = (*>)
+{-# INLINE (>>) #-}
 
 -- | Alias for 'pure'.
 return
@@ -743,6 +753,8 @@ instance Functor [] where
     type Suitable [] a = ()
     fmap = map
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 instance Applicative [] where
     lower = lowerP
@@ -752,13 +764,21 @@ instance Applicative [] where
     pure = Prelude.pure
     liftA2 = liftA2P
     liftA3 = liftA3P
+    {-# INLINE lower #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Alternative [] where
-  empty = []
-  (<|>) = (++)
+    empty = []
+    (<|>) = (++)
 
 instance Monad [] where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance MonadFail [] where
     fail _ = []
@@ -865,17 +885,31 @@ instance Traversable (Either a) where
 instance Functor Set where
     type Suitable Set a = Ord a
     fmap = Set.map
+    {-# INLINE fmap #-}
     x <$ xs = if null xs then Set.empty else Set.singleton x
+    {-# INLINE (<$) #-}
 
 instance Applicative Set where
     pure = Set.singleton
-    fs <*> xs = foldMap (`Set.map` xs) fs
+    {-# INLINE pure #-}
     xs *> ys = if null xs then Set.empty else ys
     xs <* ys = if null ys then Set.empty else xs
-    lower = lowerM
+    lower xs = fromBuilder (go xs) where
+      go :: forall a. Ap Set a -> Builder a
+      go (Pure !x) c = c x
+      go (Ap f !x) c = go f (\fa fb -> Set.foldl' (\a e -> c (fa e) a) fb x)
+      {-# INLINE go #-}
+    {-# INLINE lower #-}
+
+type Builder a = forall b. (a -> b -> b) -> b -> b
+
+fromBuilder :: Ord a => Builder a -> Set a
+fromBuilder xs = xs Set.insert Set.empty
+{-# INLINE fromBuilder #-}
 
 instance Monad Set where
     (>>=) = flip foldMap
+    {-# INLINE (>>=) #-}
 
 instance MonadFail Set where
     fail _ = Set.empty

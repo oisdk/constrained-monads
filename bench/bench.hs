@@ -12,7 +12,11 @@ zs = [1..5]
 
 main :: IO ()
 main = defaultMain
-  [ bgroup "basic" [ bench "Ado" $ whnf (sumThriceNoAdo xs ys) zs
-                   , bench "Do"  $ whnf (sumThriceAdo   xs ys) zs
-                   ]
+  [
+    bgroup "prob" [ bench "Ado" $ whnf (diceAdo   30) [1..6]
+                  , bench "Do"  $ whnf (diceNoAdo 30) [1..6]
+                  ]
+  , bgroup "set"  [ bench "Ado" $ whnf (sumThriceAdo   xs ys) zs
+                  , bench "Do"  $ whnf (sumThriceNoAdo xs ys) zs
+                  ]
   ]
