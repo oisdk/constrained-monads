@@ -219,7 +219,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     pure
         :: Suitable f a
         => a -> f a
-    pure x = lower (Prelude.pure x)
+    pure = lower . Prelude.pure
     {-# INLINE pure #-}
     infixl 4 <*>
     -- | Sequential application.
@@ -292,6 +292,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     liftA2 f xs ys
         = lower (Control.Applicative.liftA2 f (eta xs) (eta ys))
     {-# INLINE liftA2 #-}
+
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
@@ -310,8 +311,7 @@ lowerM :: (Monad f, Suitable f a) => Initial.Ap f a -> f a
 lowerM = go pure where
   go :: (Suitable f b, Monad f) => (a -> f b) -> Initial.Ap f a -> f b
   go f (Pure x) = f x
-  go f (Ap x xs) = go (\c -> x >>= f . c) xs
-  {-# INLINE go #-}
+  go f (Ap x xs) = x >>= \y -> go (\c -> (f . c) y) xs
 {-# INLINE lowerM #-}
 
 {-# INLINE liftA2P #-}
@@ -691,7 +691,7 @@ join x = x >>= id
 
 -- | Function to which the @if ... then ... else@ syntax desugars to
 ifThenElse :: Bool -> a -> a -> a
-ifThenElse True t _ = t
+ifThenElse True  t _ = t
 ifThenElse False _ f = f
 
 infixl 1 >>
@@ -708,6 +708,7 @@ return
     :: (Applicative f, Suitable f a)
     => a -> f a
 return = pure
+{-# INLINE return #-}
 
 --------------------------------------------------------------------------------
 -- instances
@@ -867,19 +868,22 @@ instance Functor Set where
     x <$ xs = if null xs then Set.empty else Set.singleton x
     {-# INLINE (<$) #-}
 
--- newtype List a = List (forall r. Monoid r => (a -> r) -> r)
+newtype List a
+  = List (forall b. (b -> a -> b) -> b -> b)
 
--- instance Show a => Show (List a) where
---     show (List c) = show (c (:[]))
+instance Prelude.Functor List where
+    fmap f (List xs) = List (\c -> xs (\ !a e -> c a (f e)))
+    {-# INLINE fmap #-}
 
--- instance Prelude.Functor List where
---     fmap f (List c) = List (\k -> c (k . f))
+instance Prelude.Applicative List where
+    pure x =
+        List (\c b -> c b x)
+    {-# INLINE pure #-}
+    List fs <*> List xs =
+      List (\c -> fs (\ !fb f -> xs (\ !xb x -> c xb (f x)) fb))
+    {-# INLINE (<*>) #-}
 
--- instance Prelude.Applicative List where
---     pure x = List (\k -> k x)
---     List f <*> List x = List (\k -> f (\g -> x (k .g)))
-
-type instance Unconstrained Set = []
+type instance Unconstrained Set = List
 
 instance Applicative Set where
     pure = Set.singleton
@@ -888,9 +892,9 @@ instance Applicative Set where
     {-# INLINE (*>) #-}
     xs <* ys = if null ys then Set.empty else xs
     {-# INLINE (<*) #-}
-    lower = Set.fromList
+    lower (List xs) = xs (flip Set.insert) Set.empty
     {-# INLINE lower #-}
-    eta = Set.toList
+    eta xs = List (\f b -> Set.foldl' f b xs)
     {-# INLINE eta #-}
 
 instance Monad Set where
