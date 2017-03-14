@@ -10,11 +10,11 @@ import           Prob
 sumThriceNoAdo :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceNoAdo xs ys zs = size $ do
   x <- fromList xs
+  a <- fromList [0..x]
   y <- fromList ys
   z <- fromList zs
   t <- fromList xs
   u <- fromList ys
-  a <- fromList [0..x]
   b <- fromList [0..y]
   c <- fromList [0..z]
   g <- fromList xs
@@ -25,12 +25,12 @@ sumThriceNoAdo xs ys zs = size $ do
 diceNoAdo :: Integer -> [Integer] -> Double
 diceNoAdo n die' = probOf n $ do
   t <- die
+  a <- upTo t
   u <- die
   w <- die
   x <- die
-  a <- upTo t
   v <- upTo u
-  y <- die
+  y <- upTo w
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = uniform die'

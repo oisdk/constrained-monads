@@ -10,11 +10,11 @@ import           Prob
 sumThriceAdoFinal :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceAdoFinal xs ys zs = size . lowerFinal $ do
   x <- liftFinal (fromList xs)
+  a <- liftFinal (fromList [0..x])
   y <- liftFinal (fromList ys)
   z <- liftFinal (fromList zs)
   t <- liftFinal (fromList xs)
   u <- liftFinal (fromList ys)
-  a <- liftFinal (fromList [0..x])
   b <- liftFinal (fromList [0..y])
   c <- liftFinal (fromList [0..z])
   g <- liftFinal (fromList xs)
@@ -25,11 +25,11 @@ sumThriceAdoFinal xs ys zs = size . lowerFinal $ do
 sumThriceAdoConstrained :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceAdoConstrained xs ys zs = size . lowerConstrained $ do
   x <- liftConstrained (fromList xs)
+  a <- liftConstrained (fromList [0..x])
   y <- liftConstrained (fromList ys)
   z <- liftConstrained (fromList zs)
   t <- liftConstrained (fromList xs)
   u <- liftConstrained (fromList ys)
-  a <- liftConstrained (fromList [0..x])
   b <- liftConstrained (fromList [0..y])
   c <- liftConstrained (fromList [0..z])
   g <- liftConstrained (fromList xs)
@@ -40,11 +40,11 @@ sumThriceAdoConstrained xs ys zs = size . lowerConstrained $ do
 sumThriceAdoCodensity :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceAdoCodensity xs ys zs = size . lowerCodensity $ do
   x <- liftCodensity (fromList xs)
+  a <- liftCodensity (fromList [0..x])
   y <- liftCodensity (fromList ys)
   z <- liftCodensity (fromList zs)
   t <- liftCodensity (fromList xs)
   u <- liftCodensity (fromList ys)
-  a <- liftCodensity (fromList [0..x])
   b <- liftCodensity (fromList [0..y])
   c <- liftCodensity (fromList [0..z])
   g <- liftCodensity (fromList xs)
@@ -55,12 +55,12 @@ sumThriceAdoCodensity xs ys zs = size . lowerCodensity $ do
 diceAdoFinal :: Integer -> [Integer] -> Double
 diceAdoFinal n die' = probOf n . lowerFinal $ do
   t <- die
+  a <- liftFinal (upTo t)
   u <- die
   w <- die
   x <- die
-  a <- liftFinal (upTo t)
   v <- liftFinal (upTo u)
-  y <- die
+  y <- liftFinal (upTo w)
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = liftFinal (uniform die')
@@ -68,12 +68,12 @@ diceAdoFinal n die' = probOf n . lowerFinal $ do
 diceAdoConstrained :: Integer -> [Integer] -> Double
 diceAdoConstrained n die' = probOf n . lowerConstrained $ do
   t <- die
+  a <- liftConstrained (upTo t)
   u <- die
   w <- die
   x <- die
-  a <- liftConstrained (upTo t)
   v <- liftConstrained (upTo u)
-  y <- die
+  y <- liftConstrained (upTo w)
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = liftConstrained (uniform die')
@@ -81,12 +81,12 @@ diceAdoConstrained n die' = probOf n . lowerConstrained $ do
 diceAdoCodensity :: Integer -> [Integer] -> Double
 diceAdoCodensity n die' = probOf n . lowerCodensity $ do
   t <- die
+  a <- liftCodensity (upTo t)
   u <- die
   w <- die
   x <- die
-  a <- liftCodensity (upTo t)
   v <- liftCodensity (upTo u)
-  y <- die
+  y <- liftCodensity (upTo w)
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = liftCodensity (uniform die')
