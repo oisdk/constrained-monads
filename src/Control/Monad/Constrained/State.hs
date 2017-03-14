@@ -31,6 +31,8 @@ import qualified Control.Monad.Trans.Maybe        as Maybe
 import qualified Control.Monad.Trans.Reader       as Reader
 import qualified Control.Monad.Trans.Except       as Except
 
+import qualified Prelude
+
 -- | A class for monads with state.
 class Monad m =>
       MonadState s m  | m -> s where
@@ -79,19 +81,21 @@ modify' f =
               let s' = f s
               in s' `seq` ((), s'))
 
-instance Monad m => MonadState s (StateT s m) where
-  type StateSuitable (StateT s m) a = Suitable m (a, s)
-  state f = StateT (pure . f)
+instance (Monad m, Prelude.Monad (Unconstrained m)) =>
+         MonadState s (StateT s m) where
+    type StateSuitable (StateT s m) a = Suitable m (a, s)
+    state f = StateT (pure . f)
 
-instance Monad m => MonadState s (State.Lazy.StateT s m) where
-  type StateSuitable (State.Lazy.StateT s m) a = Suitable m (a, s)
-  state f = State.Lazy.StateT (pure . f)
+instance (Monad m, Prelude.Monad (Unconstrained m)) =>
+         MonadState s (State.Lazy.StateT s m) where
+    type StateSuitable (State.Lazy.StateT s m) a = Suitable m (a, s)
+    state f = State.Lazy.StateT (pure . f)
 
 instance (MonadState s m, Suitable m r) => MonadState s (Cont.ContT r m) where
     type StateSuitable (Cont.ContT r m) a = StateSuitable m a
     state = lift . state
 
-instance MonadState s m =>
+instance (MonadState s m, Prelude.Monad (Unconstrained m)) =>
          MonadState s (Maybe.MaybeT m) where
     type StateSuitable (Maybe.MaybeT m) a
         = (Suitable m (Maybe a), StateSuitable m a)
@@ -107,7 +111,7 @@ instance MonadState s m =>
     type StateSuitable (Reader.ReaderT r m) a = StateSuitable m a
     state = lift . state
 
-instance MonadState s m =>
+instance (MonadState s m, Prelude.Monad (Unconstrained m)) =>
          MonadState s (Except.ExceptT e m) where
     type StateSuitable (Except.ExceptT e m) a
         = (Suitable m (Either e a), StateSuitable m a)

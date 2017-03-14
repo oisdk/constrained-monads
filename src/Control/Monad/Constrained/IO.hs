@@ -20,6 +20,8 @@ import qualified Control.Monad.Trans.State.Lazy as Lazy
 
 import           GHC.Exts
 
+import qualified Prelude
+
 -- | A class for monads which can have IO actions lifted into them.
 class Monad m =>
       MonadIO m  where
@@ -35,7 +37,7 @@ instance MonadIO m =>
     type SuitableIO (IdentityT m) a = SuitableIO m a
     liftIO = lift . liftIO
 
-instance MonadIO m =>
+instance (MonadIO m, Prelude.Monad (Unconstrained m)) =>
          MonadIO (MaybeT m) where
     type SuitableIO (MaybeT m) a = (Suitable m (Maybe a), SuitableIO m a)
     liftIO = lift . liftIO
@@ -50,12 +52,12 @@ instance MonadIO m =>
     type SuitableIO (ReaderT r m) a = SuitableIO m a
     liftIO = lift . liftIO
 
-instance MonadIO m =>
+instance (MonadIO m, Prelude.Monad (Unconstrained m)) =>
          MonadIO (StateT s m) where
     type SuitableIO (StateT s m) a = (SuitableIO m a, Suitable m (a, s))
     liftIO = lift . liftIO
 
-instance MonadIO m =>
+instance (MonadIO m, Prelude.Monad (Unconstrained m)) =>
          MonadIO (Lazy.StateT s m) where
     type SuitableIO (Lazy.StateT s m) a = (SuitableIO m a, Suitable m (a, s))
     liftIO = lift . liftIO

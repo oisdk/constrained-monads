@@ -27,6 +27,8 @@ import qualified Control.Monad.Trans.Identity     as Identity
 import qualified Control.Monad.Trans.Maybe        as Maybe
 import qualified Control.Monad.Trans.Except       as Except
 
+import qualified Prelude
+
 -- | A class for reader monads.
 class Monad m =>
       MonadReader r m  | m -> r where
@@ -83,11 +85,10 @@ liftLocal ask' local' f m =
         r <- ask'
         local' f (Cont.runContT m (local' (const r) . c))
 
-instance MonadReader r m => MonadReader r (Except.ExceptT e m) where
+instance (MonadReader r m, Prelude.Monad (Unconstrained m)) =>
+         MonadReader r (Except.ExceptT e m) where
     type ReaderSuitable (Except.ExceptT e m) a
-        = (ReaderSuitable m a
-          ,Suitable m (Either e a)
-          ,ReaderSuitable m (Either e a))
+        = (ReaderSuitable m a, Suitable m (Either e a), ReaderSuitable m (Either e a))
     ask = lift ask
     local = Except.mapExceptT . local
     reader = lift . reader
@@ -98,7 +99,7 @@ instance MonadReader r m => MonadReader r (Identity.IdentityT m) where
     local = Identity.mapIdentityT . local
     reader = lift . reader
 
-instance MonadReader r m =>
+instance (MonadReader r m, Prelude.Monad (Unconstrained m)) =>
          MonadReader r (Maybe.MaybeT m) where
     type ReaderSuitable (Maybe.MaybeT m) a
         = (ReaderSuitable m a
@@ -108,7 +109,7 @@ instance MonadReader r m =>
     local = Maybe.mapMaybeT . local
     reader = lift . reader
 
-instance MonadReader r m =>
+instance (MonadReader r m, Prelude.Monad (Unconstrained m)) =>
          MonadReader r (State.Lazy.StateT s m) where
     type ReaderSuitable (State.Lazy.StateT s m) a
         = (ReaderSuitable m a
@@ -118,7 +119,7 @@ instance MonadReader r m =>
     local = State.Lazy.mapStateT . local
     reader = lift . reader
 
-instance MonadReader r m =>
+instance (MonadReader r m, Prelude.Monad (Unconstrained m)) =>
          MonadReader r (State.Strict.StateT s m) where
     type ReaderSuitable (State.Strict.StateT s m) a
         = (ReaderSuitable m a

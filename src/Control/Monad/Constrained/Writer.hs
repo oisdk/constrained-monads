@@ -45,6 +45,8 @@ import           Control.Monad.Constrained.Reader
 import           Data.Functor.Identity
 import           Data.Functor.Classes
 
+import qualified Prelude
+
 -- | A class for monads with logging ability.
 class (Monoid w, Monad m) => MonadWriter w m | m -> w where
     type WriterSuitable m a :: Constraint
@@ -61,7 +63,7 @@ class (Monoid w, Monad m) => MonadWriter w m | m -> w where
     -- easier to manage.
     passC   :: WriterSuitable m a => (a -> w -> w) -> m a -> m a
 
-instance MonadWriter w m =>
+instance (MonadWriter w m, Prelude.Monad (Unconstrained m)) =>
          MonadWriter w (Except.ExceptT e m) where
     type WriterSuitable (Except.ExceptT e m) a
         = (WriterSuitable m a
@@ -87,7 +89,7 @@ pass
     => m (a, w -> w) -> m a
 pass = fmap fst . passC snd
 
-instance MonadWriter w m =>
+instance (MonadWriter w m, Prelude.Monad (Unconstrained m)) =>
          MonadWriter w (State.Lazy.StateT s m) where
     type WriterSuitable (State.Lazy.StateT s m) a
         = (WriterSuitable m a
@@ -103,7 +105,7 @@ instance MonadWriter w m =>
              State.Lazy.runStateT m)
     passC c m = State.Lazy.StateT (passC (c . fst) . State.Lazy.runStateT m)
 
-instance MonadWriter w m =>
+instance (MonadWriter w m, Prelude.Monad (Unconstrained m)) =>
          MonadWriter w (State.Strict.StateT s m) where
     type WriterSuitable (State.Strict.StateT s m) a
         = (WriterSuitable m a
@@ -127,11 +129,10 @@ instance MonadWriter w m =>
     listenC f = Identity.mapIdentityT (listenC f)
     passC f = Identity.mapIdentityT (passC f)
 
-instance MonadWriter w m => MonadWriter w (Maybe.MaybeT m) where
+instance (MonadWriter w m, Prelude.Monad (Unconstrained m)) =>
+         MonadWriter w (Maybe.MaybeT m) where
     type WriterSuitable (Maybe.MaybeT m) a
-        = (WriterSuitable m a
-          ,WriterSuitable m (Maybe a)
-          ,Suitable m (Maybe a))
+        = (WriterSuitable m a, WriterSuitable m (Maybe a), Suitable m (Maybe a))
     writer = lift . writer
     tell = lift . tell
     listenC f = (Maybe.mapMaybeT . listenC . flip) (fmap . flip f)
@@ -161,7 +162,8 @@ instance Functor m => Functor (WriterT s m) where
   x <$ WriterT_ xs = WriterT_ (x <$ xs)
 
 type instance Unconstrained (WriterT s m) = Ap (WriterT s m)
-instance Monad m =>
+
+instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (WriterT s m) where
     pure x = WriterT_ (pure x)
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
@@ -170,8 +172,9 @@ instance Monad m =>
     lower = lowerM
     eta = liftAp
 
-instance Monad m => Monad (WriterT s m) where
-  WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))
+instance (Monad m, Prelude.Monad (Unconstrained m)) =>
+         Monad (WriterT s m) where
+    WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))
 
 -- first_  :: (Functor f, Suitable f (b, c)) => (a -> f b) -> (a, c) -> f (b, c)
 -- first_  f (x,y) = fmap (flip (,) y) (f x)
@@ -218,7 +221,7 @@ runWriter =
 
 {-# INLINE runWriter #-}
 
-instance (Monoid s, Monad m) =>
+instance (Monoid s, Monad m, Prelude.Monad (Unconstrained m)) =>
          MonadWriter s (WriterT s m) where
     type WriterSuitable (WriterT s m) a = Suitable m (a, s)
     tell s = WriterT (pure ((), s))
@@ -244,21 +247,21 @@ instance MonadTrans (WriterT w) where
   type SuitableLift (WriterT w) m a = Suitable m (a, w)
   lift xs = WriterT_ . State.Strict.StateT $ (\s -> fmap (flip (,) s) xs)
 
-instance MonadState s m =>
+instance (MonadState s m, Prelude.Monad (Unconstrained m)) =>
          MonadState s (WriterT w m) where
     type StateSuitable (WriterT w m) a = (StateSuitable m a, Suitable m (a, w))
     get = lift get
     put = lift . put
     state = lift . state
 
-instance MonadError e m =>
+instance (MonadError e m, Prelude.Monad (Unconstrained m)) =>
          MonadError e (WriterT w m) where
     type SuitableError (WriterT w m) a = SuitableError m (a, w)
     throwError e = WriterT_ . State.Strict.StateT $ const (throwError e)
     catchError (WriterT_ xs) f =
         WriterT_ (State.Strict.liftCatch catchError xs (unWriterT . f))
 
-instance MonadReader r m =>
+instance (MonadReader r m, Prelude.Monad (Unconstrained m)) =>
          MonadReader r (WriterT w m) where
     type ReaderSuitable (WriterT w m) a
         = (ReaderSuitable m a
