@@ -8,16 +8,16 @@ import           Data.Set
 import           Prob
 
 sumThriceAdo :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdo xs ys zs = size . lower $ do
-  x <- liftAp (fromList xs)
-  y <- liftAp (fromList ys)
-  z <- liftAp (fromList zs)
-  t <- liftAp (fromList xs)
-  u <- liftAp (fromList ys)
-  a <- liftAp (fromList [0..x])
-  b <- liftAp (fromList [0..y])
-  c <- liftAp (fromList [0..z])
-  v <- liftAp (fromList zs)
+sumThriceAdo xs ys zs = size . lower . runAp eta $ do
+  x <- fLiftAp (fromList xs)
+  y <- fLiftAp (fromList ys)
+  z <- fLiftAp (fromList zs)
+  t <- fLiftAp (fromList xs)
+  u <- fLiftAp (fromList ys)
+  a <- fLiftAp (fromList [0..x])
+  b <- fLiftAp (fromList [0..y])
+  c <- fLiftAp (fromList [0..z])
+  v <- fLiftAp (fromList zs)
   pure (x + a + y + b + z + c + t + u + v)
 
 diceAdo :: Integer -> [Integer] -> Double

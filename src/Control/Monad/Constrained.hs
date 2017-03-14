@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE RankNTypes           #-}
 
 -- | A module for constrained monads. This module is intended to be imported
@@ -24,13 +26,14 @@ module Control.Monad.Constrained
   ,Alternative(..)
   ,Traversable(..)
   ,MonadFail(..)
+  ,Unconstrained
   ,
-   -- * Horrible type-level stuff
+   -- * Unconstrained applicative stuff
   Ap(..)
-  ,retractAp
+  ,Initial.retractAp
   ,lowerM
-  ,liftAp
-  ,hoistAp
+  ,Initial.liftAp
+  ,Initial.hoistAp
   ,
    -- * Useful functions
    guard
@@ -77,7 +80,7 @@ import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import           Data.Tree                        (Tree(..))
-import           Data.Array
+import           Data.Array                       (Array, Ix)
 
 import           Control.Monad.Trans.Cont         (ContT)
 import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
@@ -96,7 +99,8 @@ import           Control.Arrow (first)
 import           Data.Tuple
 import           Control.Monad.Trans.State.Strict (state, runState)
 
-import           Control.Applicative.Free
+import qualified Control.Applicative.Free         as Initial
+import Control.Applicative.Free (Ap (Pure, Ap ))
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -158,6 +162,8 @@ class Functor f  where
     (<$) = fmap . const
     {-# INLINE (<$) #-}
 
+type family Unconstrained (f :: * -> *) :: * -> *
+
 -- | A functor with application.
 --
 -- This class is slightly different (although equivalent) to the class
@@ -201,26 +207,27 @@ class Functor f  where
 --   * @('<*>') = 'ap'@
 --
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
-class Functor f =>
+class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
-    {-# MINIMAL lower #-}
-
+    {-# MINIMAL eta, lower #-}
+    eta
+        :: f a -> Unconstrained f a
+    lower
+        :: Suitable f a
+        => Unconstrained f a -> f a
     -- | Lift a value.
     pure
         :: Suitable f a
         => a -> f a
-    pure x = lower (Pure x)
+    pure x = lower (Prelude.pure x)
     {-# INLINE pure #-}
-
     infixl 4 <*>
-
     -- | Sequential application.
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    (<*>) = liftA2 ($)
+    (<*>) fs xs = lower (eta fs Prelude.<*> eta xs)
     {-# INLINE (<*>) #-}
-
     infixl 4 *>
     -- | Sequence actions, discarding the value of the first argument.
     (*>)
@@ -228,7 +235,6 @@ class Functor f =>
         => f a -> f b -> f b
     (*>) = liftA2 (const id)
     {-# INLINE (*>) #-}
-
     infixl 4 <*
     -- | Sequence actions, discarding the value of the second argument.
     (<*)
@@ -237,7 +243,7 @@ class Functor f =>
     (<*) = liftA2 const
     {-# INLINE (<*) #-}
     -- | The shenanigans introduced by this function are to account for the fact
-    -- that you can't (I don't think) write an arbitrary lift function on
+    -- that you can't (I don't think) write an arbitrary eta function on
     -- non-monadic applicatives that have constrained types. For instance, if
     -- the only present functions are:
     --
@@ -280,23 +286,17 @@ class Functor f =>
     --
     -- Alternatively, if your applicative is a 'Monad', 'lower' can be defined
     -- in terms of @('>>=')@, which is what 'lowerM' does.
-    lower
-        :: Suitable f a
-        => Ap f a -> f a
-
     liftA2
         :: Suitable f c
         => (a -> b -> c) -> f a -> f b -> f c
-    liftA2 f xs ys =
-        lower (Ap ys (Ap xs (Pure f)))
-
+    liftA2 f xs ys
+        = lower (Control.Applicative.liftA2 f (eta xs) (eta ys))
+    {-# INLINE liftA2 #-}
     liftA3
         :: Suitable f d
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-    liftA3 f xs ys zs =
-        lower (Ap zs (Ap ys (Ap xs (Pure f))))
-
-    {-# INLINE liftA2 #-}
+    liftA3 f xs ys zs
+        = lower (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
     {-# INLINE liftA3 #-}
 
 infixl 4 <**>
@@ -306,9 +306,9 @@ infixl 4 <**>
 {-# INLINE (<**>) #-}
 
 -- | A definition of 'lower' that uses monadic operations.
-lowerM :: (Monad f, Suitable f a) => Ap f a -> f a
+lowerM :: (Monad f, Suitable f a) => Initial.Ap f a -> f a
 lowerM = go pure where
-  go :: (Suitable f b, Monad f) => (a -> f b) -> Ap f a -> f b
+  go :: (Suitable f b, Monad f) => (a -> f b) -> Initial.Ap f a -> f b
   go f (Pure x) = f x
   go f (Ap x xs) = go (\c -> x >>= f . c) xs
   {-# INLINE go #-}
@@ -720,8 +720,11 @@ instance Functor [] where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
+type instance Unconstrained [] = []
+
 instance Applicative [] where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -755,8 +758,10 @@ instance Functor Maybe where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained Maybe = Maybe
 instance Applicative Maybe where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -783,8 +788,11 @@ instance Functor IO where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained IO = IO
+
 instance Applicative IO where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -807,8 +815,11 @@ instance Functor Identity where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained Identity = Identity
+
 instance Applicative Identity where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -827,8 +838,11 @@ instance Functor (Either e) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained (Either a) = Either a
+
 instance Applicative (Either a) where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -853,23 +867,19 @@ instance Functor Set where
     x <$ xs = if null xs then Set.empty else Set.singleton x
     {-# INLINE (<$) #-}
 
+type instance Unconstrained Set = []
+
 instance Applicative Set where
     pure = Set.singleton
     {-# INLINE pure #-}
     xs *> ys = if null xs then Set.empty else ys
+    {-# INLINE (*>) #-}
     xs <* ys = if null ys then Set.empty else xs
-    lower xs = fromBuilder (go xs) where
-      go :: forall a. Ap Set a -> Builder a
-      go (Pure !x) c = c x
-      go (Ap !x f) c = go f (\fa fb -> Set.foldl' (\a e -> c (fa e) a) fb x)
-      {-# INLINE go #-}
+    {-# INLINE (<*) #-}
+    lower = Set.fromList
     {-# INLINE lower #-}
-
-type Builder a = forall b. (a -> b -> b) -> b -> b
-
-fromBuilder :: Ord a => Builder a -> Set a
-fromBuilder xs = xs Set.insert Set.empty
-{-# INLINE fromBuilder #-}
+    eta = Set.toList
+    {-# INLINE eta #-}
 
 instance Monad Set where
     (>>=) = flip foldMap
@@ -889,7 +899,7 @@ instance Functor (Array i) where
 
 instance Ix i =>
          Traversable (Array i) where
-    traverse f = lower . Prelude.traverse (liftAp . f)
+    traverse f = lower . Prelude.traverse (eta . f)
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
@@ -901,8 +911,11 @@ instance Functor ((,) a) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained ((,) a) = ((,) a)
+
 instance Monoid a => Applicative ((,) a) where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -926,8 +939,11 @@ instance Functor Seq where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained Seq = Seq
+
 instance Applicative Seq where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -950,8 +966,11 @@ instance Functor Tree where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained Tree = Tree
+
 instance Applicative Tree where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -964,7 +983,7 @@ instance Monad Tree where
 
 instance Traversable Tree where
     traverse f (Node x ts) =
-        let g = (liftAp . f)
+        let g = (eta . f)
         in lower
                (Node Prelude.<$> g x Prelude.<*>
                 Prelude.traverse (Prelude.traverse g) ts)
@@ -974,8 +993,11 @@ instance Functor ((->) a) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained ((->) a) = ((->) a)
+
 instance Applicative ((->) a) where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -991,8 +1013,10 @@ instance Functor (ContT r m) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained (ContT r m) = ContT r m
 instance Applicative (ContT r m) where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1008,8 +1032,11 @@ instance Functor Control.Applicative.ZipList where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained Control.Applicative.ZipList = Control.Applicative.ZipList
+
 instance Applicative Control.Applicative.ZipList where
-    lower = retractAp
+    lower = id
+    eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
@@ -1024,8 +1051,10 @@ instance Functor m => Functor (Strict.StateT s m) where
     {-# INLINE fmap #-}
     x <$ xs = Strict.StateT ((fmap.first) (const x) . Strict.runStateT xs)
 
+type instance Unconstrained (Strict.StateT s m) = Ap (Strict.StateT s m)
 instance Monad m =>
          Applicative (Strict.StateT s m) where
+    eta = Initial.liftAp
     pure a =
         Strict.StateT $
         \(!s) ->
@@ -1069,8 +1098,10 @@ instance Functor m => Functor (StateT s m) where
     {-# INLINE fmap #-}
     x <$ StateT xs = StateT ((fmap.first) (const x) . xs)
 
+type instance Unconstrained (StateT s m) = Ap (StateT s m)
 instance (Monad m) =>
          Applicative (StateT s m) where
+    eta = Initial.liftAp
     pure a =
         StateT $
         \s ->
@@ -1113,15 +1144,16 @@ instance (Functor m) => Functor (ReaderT r m) where
     {-# INLINE fmap #-}
     x <$ ReaderT xs = ReaderT (\r -> x <$ xs r)
 
+type instance Unconstrained (ReaderT r m) = ReaderT r (Unconstrained m)
 instance (Applicative m) => Applicative (ReaderT r m) where
     pure = liftReaderT . pure
+    eta (ReaderT f) = ReaderT (eta . f)
     {-# INLINE pure #-}
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
     lower ys = ReaderT $ \r -> lower (tr r ys) where
-      tr :: r -> Ap (ReaderT r m) xs -> Ap m xs
-      tr _ (Pure x) = Pure x
-      tr r (Ap x xs) = Ap (runReaderT x r) (tr r xs)
+      tr :: r -> (ReaderT r (Unconstrained m)) xs -> Unconstrained m xs
+      tr r (ReaderT xs) = xs r
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1151,8 +1183,10 @@ instance Functor m =>
     fmap f (MaybeT xs) = MaybeT ((fmap . fmap) f xs)
     x <$ MaybeT xs = MaybeT (fmap (x <$) xs)
 
+type instance Unconstrained (MaybeT m) = Ap (MaybeT m)
 instance Monad m =>
          Applicative (MaybeT m) where
+    eta = Initial.liftAp
     pure x = MaybeT (pure (Just x))
     MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
     lower = lowerM
@@ -1178,8 +1212,11 @@ instance Functor m =>
     fmap f (ExceptT xs) = ExceptT ((fmap . fmap) f xs)
     x <$ ExceptT xs = ExceptT (fmap (x <$) xs)
 
+type instance Unconstrained (ExceptT e m) = Ap (ExceptT e m)
 instance Monad m =>
          Applicative (ExceptT e m) where
+    eta = Initial.liftAp
+
     pure x = ExceptT (pure (Right x))
     ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
     lower = lowerM
@@ -1206,14 +1243,16 @@ instance Functor m =>
         (coerce :: (a -> f b -> f a) -> a -> IdentityT f b -> IdentityT f a)
             (<$)
 
+type instance Unconstrained (IdentityT m) = IdentityT (Unconstrained m)
 instance Applicative m =>
          Applicative (IdentityT m) where
+    eta (IdentityT x) = IdentityT (eta x)
     pure = (coerce :: (a -> f a) -> a -> IdentityT f a) pure
     (<*>) =
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
     lower =
-        (coerce :: (Ap f xs -> f b) -> (Ap (IdentityT f) xs -> IdentityT f b))
+        (coerce :: (Unconstrained f b -> f b) -> (IdentityT (Unconstrained f) b -> IdentityT f b))
             lower
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
@@ -1233,8 +1272,10 @@ instance Functor (ST s) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained (ST s) = ST s
 instance Applicative (ST s) where
-    lower = retractAp
+    lower = id
+    eta = id
 
 instance Monad (ST s) where
     (>>=) = (Prelude.>>=)
@@ -1244,20 +1285,22 @@ instance Functor (Const a) where
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
 
+type instance Unconstrained (Const a) = Const a
 instance Monoid a => Applicative (Const a) where
-    lower = retractAp
+    lower = id
+    eta = id
 
 instance (Functor f, Functor g) =>
          Functor (Compose f g) where
     type Suitable (Compose f g) a = (Suitable g a, Suitable f (g a))
     fmap f (Compose xs) = Compose ((fmap . fmap) f xs)
 
+type instance Unconstrained (Compose f g) = Compose (Unconstrained f) (Unconstrained g)
+
 instance (Applicative f, Applicative g) =>
          Applicative (Compose f g) where
-  lower = Compose . go (lower . Prelude.fmap lower) where
-    go :: forall a b. (Ap f (Ap g a) -> f (g b)) -> Ap (Compose f g) a -> f (g b)
-    go f (Pure x) = f (Pure (Pure x))
-    go f (Ap (Compose x) fs) = go (f . Control.Applicative.liftA2 Ap (liftAp x)) fs
+  lower (Compose xs) = Compose (lower (Prelude.fmap lower xs))
+  eta (Compose xs) = Compose (Prelude.fmap eta (eta xs))
 
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
@@ -1267,14 +1310,14 @@ instance (Functor f, Functor g) => Functor (Product f g) where
     type Suitable (Product f g) a = (Suitable f a, Suitable g a)
     fmap f (Pair x y) = Pair (fmap f x) (fmap f y)
 
+type instance Unconstrained (Product f g) = Product (Unconstrained f) (Unconstrained g)
+
 instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
-    lower x = Pair (lower . hoistAp fstP $ x) (lower . hoistAp sndP $ x)
-      where
-        fstP (Pair a _) = a
-        sndP (Pair _ b) = b
+    lower (Pair xs ys) = Pair (lower xs) (lower ys)
+    eta (Pair xs ys) = Pair (eta xs) (eta ys)
 
 instance (Alternative f, Alternative g) => Alternative (Product f g) where
     empty = Pair empty empty

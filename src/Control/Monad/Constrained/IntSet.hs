@@ -78,6 +78,9 @@ instance Applicative IntSet where
             then mempty
             else xs
     lower = lowerM
+    eta = liftAp
+
+type instance Unconstrained IntSet = Ap IntSet
 
 instance Alternative IntSet where
     empty = mempty

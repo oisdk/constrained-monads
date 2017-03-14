@@ -160,6 +160,7 @@ instance Functor m => Functor (WriterT s m) where
   fmap f (WriterT_ x) = WriterT_ (fmap f x)
   x <$ WriterT_ xs = WriterT_ (x <$ xs)
 
+type instance Unconstrained (WriterT s m) = Ap (WriterT s m)
 instance Monad m =>
          Applicative (WriterT s m) where
     pure x = WriterT_ (pure x)
@@ -167,6 +168,7 @@ instance Monad m =>
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
     lower = lowerM
+    eta = liftAp
 
 instance Monad m => Monad (WriterT s m) where
   WriterT_ xs >>= f = WriterT_ (xs >>= (unWriterT . f))

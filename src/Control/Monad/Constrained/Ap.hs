@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | This module allows the use of the Applicative Do extension with
 -- constrained monads.
@@ -11,13 +12,17 @@ module Control.Monad.Constrained.Ap
   ,return
   ,ifThenElse
   ,(>>)
-  ,liftAp
+  ,Initial.liftAp
+  ,fLiftAp
+  ,Constrained.eta
+  ,Final.retractAp
+  ,Final.runAp
   ,lower
   ,module RestPrelude)
   where
 
-import           Control.Monad.Constrained        (Ap (..), liftAp, lower)
 import qualified Control.Monad.Constrained        as Constrained
+import           Control.Monad.Constrained (lower)
 
 import           GHC.Exts
 
@@ -35,6 +40,9 @@ import qualified Control.Monad.Trans.State.Strict as Strict (StateT)
 import           Data.Functor.Identity            (Identity)
 import           Data.Sequence                    (Seq)
 import           Data.Set (Set)
+
+import qualified Control.Applicative.Free.Final as Final
+import qualified Control.Applicative.Free as Initial
 
 -- | This class is for types which have no constraints on their applicative
 -- operations, but /do/ have constraints on the monadic operations.
@@ -80,25 +88,42 @@ class Monad f => MonadFail f where
   -- | Called when a pattern match fails in do-notation.
   fail :: Suitable f a => String -> f a
 
-instance Constrained.Monad f =>
-         Monad (Ap f) where
-    type Suitable (Ap f) a = Constrained.Suitable f a
-    (>>=) ap f = liftAp (lower ap Constrained.>>= (lower . f))
-    {-# SPECIALISE (>>=) :: (Ord b, Ord a) => Ap Set a -> (a -> Ap Set b) -> Ap Set b #-}
+instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
+         Monad (Initial.Ap f) where
+    type Suitable (Initial.Ap f) a = Constrained.Suitable f a
+    (>>=) ap f = Initial.liftAp (lower ap Constrained.>>= (lower . f))
     {-# INLINE (>>=) #-}
-    join = liftAp . go lower
+    join = Initial.liftAp . go lower
       where
         go
             :: forall a f b.
                (Constrained.Suitable f b, Constrained.Monad f)
-            => (a -> f b) -> Ap f a -> f b
-        go c (Pure x) = c x
-        go f (Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
-        {-# SPECIALISE go :: Ord b => (a -> Set b) -> Ap Set a -> Set b #-}
+            => (a -> f b) -> Initial.Ap f a -> f b
+        go c (Initial.Pure x) = c x
+        go f (Initial.Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
+        {-# SPECIALISE go :: Ord b => (a -> Set b) -> Initial.Ap Set a -> Set b #-}
         {-# INLINE go #-}
     {-# INLINE join #-}
-    {-# SPECIALISE join :: Ord a => Ap Set (Ap Set a) -> Ap Set a #-}
 
+instance (Constrained.Monad f) =>
+         Monad (Final.Ap f) where
+    type Suitable (Final.Ap f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
+    (>>=) ap f =
+        Final.liftAp
+            (lower (Final.runAp Constrained.eta ap) Constrained.>>=
+             (lower . Final.runAp Constrained.eta . f))
+    {-# INLINE (>>=) #-}
+    join =
+        Final.liftAp .
+        Constrained.join .
+        lower .
+        Final.runAp Constrained.eta .
+        fmap (lower . Final.runAp Constrained.eta)
+    {-# INLINE join #-}
+
+fLiftAp :: f a -> Final.Ap f a
+fLiftAp = Final.liftAp
+{-# INLINE fLiftAp #-}
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a
 return = pure

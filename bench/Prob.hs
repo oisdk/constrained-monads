@@ -21,8 +21,11 @@ instance Num s =>
     type Suitable (Prob s) a = Ord a
     fmap f (Prob xs) = Prob (Map.mapKeysWith (+) f xs)
 
+type instance Unconstrained (Prob s) = Ap (Prob s)
+
 instance Num s =>
          Applicative (Prob s) where
+    eta = liftAp
     lower = Prob . Map.fromListWith (+) . go
       where
         go :: forall a s. Num s => Ap (Prob s) a -> [(a, s)]
