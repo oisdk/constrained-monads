@@ -144,21 +144,26 @@ newtype ConstrainedWrapper f a
 
 liftConstrained :: Constrained.Applicative f => f a -> ConstrainedWrapper f a
 liftConstrained = ConstrainedWrapper . Constrained.eta
+{-# INLINE liftConstrained #-}
 
 lowerConstrained
     :: (Constrained.Suitable f a, Constrained.Applicative f)
     => ConstrainedWrapper f a -> f a
 lowerConstrained (ConstrainedWrapper xs) = Constrained.lower xs
+{-# INLINE lowerConstrained #-}
 
 instance Constrained.Applicative f =>
          Functor (ConstrainedWrapper f) where
     fmap f (ConstrainedWrapper xs) = ConstrainedWrapper (fmap f xs)
+    {-# INLINE fmap #-}
 
 instance Constrained.Applicative f =>
          Applicative (ConstrainedWrapper f) where
     pure = ConstrainedWrapper . pure
     ConstrainedWrapper fs <*> ConstrainedWrapper xs =
         ConstrainedWrapper (fs <*> xs)
+    {-# INLINE pure #-}
+    {-# INLINE (<*>) #-}
 
 instance Constrained.Monad f =>
          Monad (ConstrainedWrapper f) where
@@ -166,15 +171,21 @@ instance Constrained.Monad f =>
         = (Constrained.Suitable f a, Constrained.Suitable f (f a))
     ConstrainedWrapper xs >>= f =
         liftConstrained (lower xs Constrained.>>= (lowerConstrained . f))
+    {-# INLINE (>>=) #-}
     join =
         liftConstrained .
         Constrained.join . lowerConstrained . fmap lowerConstrained
+    {-# INLINE join #-}
 
 liftFinal :: f a -> Final.Ap f a
 liftFinal = Final.liftAp
+{-# INLINE liftFinal #-}
 
-lowerFinal :: (Constrained.Applicative f, Constrained.Suitable f a) => Final.Ap f a -> f a
+lowerFinal
+    :: (Constrained.Applicative f, Constrained.Suitable f a)
+    => Final.Ap f a -> f a
 lowerFinal = lower . Final.runAp Constrained.eta
+{-# INLINE lowerFinal #-}
 
 liftInitial :: f a -> Initial.Ap f a
 liftInitial = Initial.liftAp
