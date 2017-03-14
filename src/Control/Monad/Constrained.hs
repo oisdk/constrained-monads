@@ -1,16 +1,16 @@
-{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE ConstraintKinds        #-}
+{-# LANGUAGE BangPatterns           #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE LambdaCase             #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE RebindableSyntax       #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE BangPatterns         #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE RebindableSyntax     #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -- | A module for constrained monads. This module is intended to be imported
 -- with the @-XRebindableSyntax@ extension turned on: everything from the
@@ -74,14 +74,15 @@ import qualified Prelude
 
 import           Data.Functor.Identity            (Identity (..))
 
+import           Data.Array                       (Array, Ix)
 import           Data.IntMap.Strict               (IntMap)
 import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
-import           Data.Tree                        (Tree(..))
-import           Data.Array                       (Array, Ix)
+import           Data.Tree                        (Tree (..))
 
+import           Control.Monad.ST                 (ST)
 import           Control.Monad.Trans.Cont         (ContT)
 import           Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
 import           Control.Monad.Trans.Identity     (IdentityT (..))
@@ -89,18 +90,17 @@ import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Control.Monad.Trans.Reader       (ReaderT (..), mapReaderT)
 import           Control.Monad.Trans.State        (StateT (..))
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT (..))
-import           Control.Monad.ST (ST)
-import           Data.Functor.Const (Const)
-import           Data.Functor.Compose (Compose(..))
-import           Data.Functor.Product (Product(..))
-import           Data.Functor.Sum (Sum(..))
+import           Data.Functor.Compose             (Compose (..))
+import           Data.Functor.Const               (Const)
+import           Data.Functor.Product             (Product (..))
+import           Data.Functor.Sum                 (Sum (..))
 
-import           Control.Arrow (first)
+import           Control.Arrow                    (first)
+import           Control.Monad.Trans.State.Strict (runState, state)
 import           Data.Tuple
-import           Control.Monad.Trans.State.Strict (state, runState)
 
+import           Control.Applicative.Free         (Ap (Ap, Pure))
 import qualified Control.Applicative.Free         as Initial
-import Control.Applicative.Free (Ap (Pure, Ap ))
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -866,6 +866,18 @@ instance Functor Set where
     {-# INLINE fmap #-}
     x <$ xs = if null xs then Set.empty else Set.singleton x
     {-# INLINE (<$) #-}
+
+-- newtype List a = List (forall r. Monoid r => (a -> r) -> r)
+
+-- instance Show a => Show (List a) where
+--     show (List c) = show (c (:[]))
+
+-- instance Prelude.Functor List where
+--     fmap f (List c) = List (\k -> c (k . f))
+
+-- instance Prelude.Applicative List where
+--     pure x = List (\k -> k x)
+--     List f <*> List x = List (\k -> f (\g -> x (k .g)))
 
 type instance Unconstrained Set = []
 

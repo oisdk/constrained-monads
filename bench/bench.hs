@@ -6,9 +6,9 @@ import NoAdo
 import Criterion.Main
 
 xs, ys, zs :: [Integer]
-xs = [1..5]
-ys = [1..5]
-zs = [1..5]
+xs = [1..4]
+ys = [1..6]
+zs = [1..6]
 
 main :: IO ()
 main = defaultMain

@@ -17,8 +17,10 @@ sumThriceNoAdo xs ys zs = size $ do
   a <- fromList [0..x]
   b <- fromList [0..y]
   c <- fromList [0..z]
+  g <- fromList xs
+  h <- fromList ys
   v <- fromList zs
-  pure (x + a + y + b + z + c + t + u + v)
+  pure (x + a + y + b + z + c + t + u + v + g + h)
 
 diceNoAdo :: Integer -> [Integer] -> Double
 diceNoAdo n die' = probOf n $ do

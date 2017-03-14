@@ -9,15 +9,16 @@
 module Control.Monad.Constrained.Ap
   (Monad(..)
   ,MonadFail(..)
+  ,Codensity(..)
   ,return
   ,ifThenElse
   ,(>>)
-  ,Initial.liftAp
-  ,fLiftAp
   ,Constrained.eta
-  ,Final.retractAp
-  ,Final.runAp
-  ,lower
+  ,Constrained.lower
+  ,liftFinal
+  ,lowerFinal
+  ,liftCodensity
+  ,lowerCodensity
   ,module RestPrelude)
   where
 
@@ -39,7 +40,6 @@ import           Control.Monad.Trans.State        (StateT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT)
 import           Data.Functor.Identity            (Identity)
 import           Data.Sequence                    (Seq)
-import           Data.Set (Set)
 
 import qualified Control.Applicative.Free.Final as Final
 import qualified Control.Applicative.Free as Initial
@@ -101,29 +101,50 @@ instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
             => (a -> f b) -> Initial.Ap f a -> f b
         go c (Initial.Pure x) = c x
         go f (Initial.Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
-        {-# SPECIALISE go :: Ord b => (a -> Set b) -> Initial.Ap Set a -> Set b #-}
-        {-# INLINE go #-}
     {-# INLINE join #-}
 
 instance (Constrained.Monad f) =>
          Monad (Final.Ap f) where
     type Suitable (Final.Ap f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
-    (>>=) ap f =
-        Final.liftAp
-            (lower (Final.runAp Constrained.eta ap) Constrained.>>=
-             (lower . Final.runAp Constrained.eta . f))
+    (>>=) ap f = Final.liftAp (lowerFinal ap Constrained.>>= (lowerFinal . f))
     {-# INLINE (>>=) #-}
-    join =
-        Final.liftAp .
-        Constrained.join .
-        lower .
-        Final.runAp Constrained.eta .
-        fmap (lower . Final.runAp Constrained.eta)
+    join = Final.liftAp . Constrained.join . lowerFinal . fmap lowerFinal
     {-# INLINE join #-}
 
-fLiftAp :: f a -> Final.Ap f a
-fLiftAp = Final.liftAp
-{-# INLINE fLiftAp #-}
+newtype Codensity f a = Codensity
+    { runCodensity :: forall b. Constrained.Suitable f b =>
+                                (a -> f b) -> f b
+    }
+
+instance Functor (Codensity k) where
+  fmap f (Codensity m) = Codensity (\k -> m (k . f))
+  {-# INLINE fmap #-}
+
+instance Applicative (Codensity f) where
+  pure x = Codensity (\k -> k x)
+  {-# INLINE pure #-}
+  Codensity f <*> Codensity g = Codensity (\bfr -> f (\ab -> g (bfr . ab)))
+  {-# INLINE (<*>) #-}
+
+instance (Constrained.Monad f) => Monad (Codensity f) where
+  type Suitable (Codensity f) a = Constrained.Suitable f a
+  m >>= k = liftCodensity (lowerCodensity m Constrained.>>= (lowerCodensity . k))
+  {-# INLINE (>>=) #-}
+  join (Codensity xs) = Codensity (Constrained.=<< xs lowerCodensity)
+  {-# INLINE join #-}
+
+liftFinal :: f a -> Final.Ap f a
+liftFinal = Final.liftAp
+
+lowerFinal :: (Constrained.Applicative f, Constrained.Suitable f a) => Final.Ap f a -> f a
+lowerFinal = lower . Final.runAp Constrained.eta
+
+liftCodensity :: Constrained.Monad f => f a -> Codensity f a
+liftCodensity xs = Codensity (xs Constrained.>>=)
+
+lowerCodensity :: (Constrained.Suitable f a, Constrained.Applicative f) => Codensity f a -> f a
+lowerCodensity (Codensity fs) = fs Constrained.pure
+
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a
 return = pure
