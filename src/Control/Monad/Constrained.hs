@@ -1018,6 +1018,7 @@ instance Functor (ContT r m) where
     (<$) = (Prelude.<$)
 
 type instance Unconstrained (ContT r m) = ContT r m
+
 instance Applicative (ContT r m) where
     lower = id
     eta = id
@@ -1061,7 +1062,8 @@ instance Functor m =>
     {-# INLINE fmap #-}
     x <$ xs = Strict.StateT ((fmap . first) (const x) . Strict.runStateT xs)
 
-type instance Unconstrained (Strict.StateT s m) = Strict.StateT s (Unconstrained m)
+type instance Unconstrained (Strict.StateT s m)
+    = Strict.StateT s (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (Strict.StateT s m) where
@@ -1069,27 +1071,27 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
     {-# INLINE eta #-}
     pure a =
         Strict.StateT $
-        \(!s) ->
+        \ !s ->
              pure (a, s)
     {-# INLINE pure #-}
     Strict.StateT mf <*> Strict.StateT mx =
         Strict.StateT $
-        \s -> do
-            (f,s') <- mf s
-            (x,s'') <- mx s'
+        \ !s -> do
+            (f,!s') <- mf s
+            (x,!s'') <- mx s'
             pure (f x, s'')
     {-# INLINE (<*>) #-}
     Strict.StateT xs *> Strict.StateT ys =
         Strict.StateT $
-        \(!s) -> do
-            (_,s') <- xs s
+        \ !s -> do
+            (_,!s') <- xs s
             ys s'
     {-# INLINE (*>) #-}
     Strict.StateT xs <* Strict.StateT ys =
         Strict.StateT $
-        \(!s) -> do
-            (x,s') <- xs s
-            (_,s'') <- ys s'
+        \ !s -> do
+            (x,!s') <- xs s
+            (_,!s'') <- ys s'
             pure (x, s'')
     {-# INLINE (<*) #-}
     lower (Strict.StateT xs) = Strict.StateT (lower . xs)
@@ -1101,7 +1103,7 @@ instance (Monad m, Alternative m, Prelude.Monad (Unconstrained m)) =>
     {-# INLINE empty #-}
     Strict.StateT m <|> Strict.StateT n =
         Strict.StateT $
-        \s ->
+        \ !s ->
              m s <|> n s
     {-# INLINE (<|>) #-}
 
@@ -1109,8 +1111,8 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Monad (Strict.StateT s m) where
     m >>= k =
         Strict.StateT $
-        \s -> do
-            (a,s') <- Strict.runStateT m s
+        \ !s -> do
+            (a, !s') <- Strict.runStateT m s
             Strict.runStateT (k a) s'
     {-# INLINE (>>=) #-}
 
