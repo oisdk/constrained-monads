@@ -190,13 +190,17 @@ lowerFinal = lower . Final.runAp Constrained.eta
 liftInitial :: f a -> Initial.Ap f a
 liftInitial = Initial.liftAp
 
-lowerInitial :: (Constrained.Applicative f, Constrained.Suitable f a) => Initial.Ap f a -> f a
+lowerInitial
+    :: (Constrained.Applicative f, Constrained.Suitable f a)
+    => Initial.Ap f a -> f a
 lowerInitial = lower . Initial.runAp Constrained.eta
 
 liftCodensity :: Constrained.Monad f => f a -> Codensity f a
 liftCodensity xs = Codensity (xs Constrained.>>=)
 
-lowerCodensity :: (Constrained.Suitable f a, Constrained.Applicative f) => Codensity f a -> f a
+lowerCodensity
+    :: (Constrained.Suitable f a, Constrained.Applicative f)
+    => Codensity f a -> f a
 lowerCodensity (Codensity fs) = fs Constrained.pure
 
 -- | An alias for 'pure'
@@ -334,7 +338,9 @@ instance Monad m =>
          Monad (IdentityT m) where
     type Suitable (IdentityT m) a = Suitable m a
     (>>=) =
-        (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
+        (coerce
+           :: (f a -> (a -> f b) -> f b)
+           -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
     join (IdentityT x) = IdentityT (join (fmap runIdentityT x))
 
