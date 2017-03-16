@@ -75,12 +75,15 @@ import qualified Prelude
 import           Data.Functor.Identity            (Identity (..))
 
 import           Data.Array                       (Array, Ix)
+import           Data.Array.Unboxed               (UArray, IArray, amap)
 import           Data.IntMap.Strict               (IntMap)
 import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import           Data.Tree                        (Tree (..))
+import qualified Data.Vector.Storable             as StorableVec
+import qualified Data.Vector.Unboxed              as UnboxedVec
 
 import           Control.Monad.ST                 (ST)
 import           Control.Monad.Trans.Cont         (ContT)
@@ -101,6 +104,7 @@ import           Data.Tuple
 
 import           Control.Applicative.Free         (Ap (Ap, Pure))
 import qualified Control.Applicative.Free         as Initial
+import qualified Control.Applicative.Free.Final   as Final
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -153,12 +157,12 @@ class Functor f  where
 
     -- | Maps a function over a functor
     fmap
-        :: Suitable f b
+        :: (Suitable f a, Suitable f b)
         => (a -> b) -> f a -> f b
 
     -- | Replace all values in the input with a default value.
     infixl 4 <$
-    (<$) :: Suitable f a => a -> f b -> f a
+    (<$) :: (Suitable f a, Suitable f b) => a -> f b -> f a
     (<$) = fmap . const
     {-# INLINE (<$) #-}
 
@@ -211,7 +215,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
     {-# MINIMAL eta, lower #-}
     eta
-        :: f a -> Unconstrained f a
+        :: Suitable f a => f a -> Unconstrained f a
     lower
         :: Suitable f a
         => Unconstrained f a -> f a
@@ -287,14 +291,14 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     -- Alternatively, if your applicative is a 'Monad', 'lower' can be defined
     -- in terms of @('>>=')@, which is what 'lowerM' does.
     liftA2
-        :: Suitable f c
+        :: (Suitable f a, Suitable f b, Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys
         = lower (Control.Applicative.liftA2 f (eta xs) (eta ys))
     {-# INLINE liftA2 #-}
 
     liftA3
-        :: Suitable f d
+        :: (Suitable f a, Suitable f b, Suitable f c, Suitable f d)
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs
         = lower (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
@@ -302,7 +306,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
 
 infixl 4 <**>
 -- | A variant of '<*>' with the arguments reversed.
-(<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
+(<**>) :: (Applicative f, Suitable f b, Suitable f (a -> b)) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 {-# INLINE (<**>) #-}
 
@@ -479,7 +483,7 @@ class (Foldable t, Functor t) =>
     -- from left to right, and collect the results. For a version that ignores
     -- the results see 'traverse_'.
     traverse
-        :: (Suitable t b, Applicative f, Suitable f (t b))
+        :: (Suitable t b, Applicative f, Suitable f (t b), Suitable f b)
         => (a -> f b) -> t a -> f (t b)
 
 
@@ -526,7 +530,7 @@ infixl 4 <$>
 -- >>> even <$> (2,2)
 -- (2,True)
 --
-(<$>) :: (Functor f, Suitable f b) => (a -> b) -> f a -> f b
+(<$>) :: (Functor f, Suitable f a, Suitable f b) => (a -> b) -> f a -> f b
 (<$>) = fmap
 {-# INLINE (<$>) #-}
 
@@ -557,7 +561,9 @@ forever a   = let a' = a *> a' in a'
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the left, i.e. from left to right.
-foldM :: (Foldable t, Monad m, Suitable m b) => (b -> a -> m b) -> b -> t a -> m b
+foldM
+    :: (Foldable t, Monad m, Suitable m b)
+    => (b -> a -> m b) -> b -> t a -> m b
 foldM f z0 xs = foldr f' pure xs z0
   where f' x k z = f z x >>= k
 
@@ -569,15 +575,20 @@ foldM f z0 xs = foldr f' pure xs z0
 -- 2
 -- 3
 -- 4
-for_ :: (Foldable t, Applicative f, Suitable f ()) => t a -> (a -> f b) -> f ()
+for_
+    :: (Foldable t, Applicative f, Suitable f ())
+    => t a -> (a -> f b) -> f ()
 {-# INLINE for_ #-}
 for_ = flip traverse_
 
 -- | Map each element of a structure to an action, evaluate these
 -- actions from left to right, and ignore the results. For a version
 -- that doesn't ignore the results see 'traverse'.
-traverse_ :: (Applicative f, Foldable t, Suitable f ()) => (a -> f b) -> t a -> f ()
-traverse_ f = foldr (\e a -> f e *> a) (pure ())
+traverse_
+    :: (Applicative f, Foldable t, Suitable f ())
+    => (a -> f b) -> t a -> f ()
+traverse_ f =
+    foldr (\e a -> f e *> a) (pure ())
 
 -- | Evaluate each action in the structure from left to right, and
 -- ignore the results. For a version that doesn't ignore the results
@@ -601,7 +612,11 @@ ensure False _ = empty
 -- and collect the results. For a version that ignores the results
 -- see 'sequenceA_'.
 sequenceA
-    :: (Applicative f, Suitable t a, Suitable f (t a), Traversable t)
+    :: (Applicative f
+       ,Suitable t a
+       ,Suitable f (t a)
+       ,Traversable t
+       ,Suitable f a)
     => t (f a) -> f (t a)
 sequenceA = traverse id
 
@@ -609,9 +624,12 @@ sequenceA = traverse id
 -- and 'foldl'; it applies a function to each element of a structure,
 -- passing an accumulating parameter from left to right, and returning
 -- a final value of this accumulator together with the new structure.
-mapAccumL :: (Traversable t, Suitable t c) => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-mapAccumL f s t = swap $ runState (traverse (state . (swap .: flip f)) t) s where
-  (.:) = (.).(.)
+mapAccumL
+    :: (Traversable t, Suitable t c)
+    => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumL f s t = swap $ runState (traverse (state . (swap .: flip f)) t) s
+  where
+    (.:) = (.) . (.)
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
@@ -665,7 +683,7 @@ replicateM cnt0 f =
 -- >>> void $ traverse print [1,2]
 -- 1
 -- 2
-void :: (Functor f, Suitable f ()) => f a -> f ()
+void :: (Functor f, Suitable f (), Suitable f a) => f a -> f ()
 void = (<$) ()
 
 -- | Collapse one monadic layer.
@@ -904,6 +922,22 @@ instance Functor (Array i) where
 instance Ix i =>
          Traversable (Array i) where
     traverse f = lower . Prelude.traverse (eta . f)
+
+instance Ix i => Functor (UArray i) where
+    type Suitable (UArray i) a = IArray UArray a
+    fmap = amap
+
+instance Functor UnboxedVec.Vector where
+    type Suitable UnboxedVec.Vector a = UnboxedVec.Unbox a
+    fmap = UnboxedVec.map
+
+-- newtype VecUnfold a
+
+type instance Unconstrained UnboxedVec.Vector = Final.Ap UnboxedVec.Vector
+
+-- instance Applicative UnboxedVec.Vector where
+--   eta = Final.liftAp
+--   lower xs = Final.runAp 
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
