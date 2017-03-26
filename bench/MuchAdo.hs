@@ -3,7 +3,7 @@
 
 module MuchAdo where
 
-import           Control.Monad.Constrained.Ap
+import           Control.Monad.Constrained.Ap hiding (sum)
 import           Data.Set
 import           Prob
 
@@ -90,3 +90,33 @@ diceAdoCodensity n die' = probOf n . lowerCodensity $ do
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = liftCodensity (uniform die')
+
+-- vectAdoFinal :: Int -> Int -> Int -> Int
+-- vectAdoFinal xs ys zs = sum $ do
+--   x <- liftFinal (enumFromN xs ys)
+--   y <- liftFinal (enumFromN ys zs)
+--   z <- liftFinal (enumFromN zs xs)
+--   a <- liftFinal (enumFromN x y)
+--   b <- liftFinal (enumFromN y z)
+--   c <- liftFinal (enumFromN z x)
+--   pure (x + y + z + a + b + c)
+
+-- vectAdoConstrained :: Int -> Int -> Int -> Int
+-- vectAdoConstrained xs ys zs = sum $ do
+--   x <- liftConstrained (enumFromN xs ys)
+--   y <- liftConstrained (enumFromN ys zs)
+--   z <- liftConstrained (enumFromN zs xs)
+--   a <- liftConstrained (enumFromN x y)
+--   b <- liftConstrained (enumFromN y z)
+--   c <- liftConstrained (enumFromN z x)
+--   pure (x + y + z + a + b + c)
+
+-- vectAdoCodensity :: Int -> Int -> Int -> Int
+-- vectAdoCodensity xs ys zs = sum $ do
+--   x <- liftCodensity (enumFromN xs ys)
+--   y <- liftCodensity (enumFromN ys zs)
+--   z <- liftCodensity (enumFromN zs xs)
+--   a <- liftCodensity (enumFromN x y)
+--   b <- liftCodensity (enumFromN y z)
+--   c <- liftCodensity (enumFromN z x)
+--   pure (x + y + z + a + b + c)

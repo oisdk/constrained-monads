@@ -23,4 +23,9 @@ main = defaultMain
                   , bench "Ado Codensity"   $ whnf (sumThriceAdoCodensity   xs ys) zs
                   , bench "Do"              $ whnf (sumThriceNoAdo          xs ys) zs
                   ]
+  -- , bgroup "vect" [ bench "Ado Final"       $ whnf (vectAdoFinal       5 6) 7
+  --                 , bench "Ado Constrained" $ whnf (vectAdoConstrained 5 6) 7
+  --                 , bench "Ado Codensity"   $ whnf (vectAdoCodensity   5 6) 7
+  --                 , bench "Do"              $ whnf (vectNoAdo          5 6) 7
+  --                 ]
   ]

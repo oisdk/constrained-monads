@@ -215,7 +215,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
     {-# MINIMAL eta, lower #-}
     eta
-        :: Suitable f a => f a -> Unconstrained f a
+        :: f a -> Unconstrained f a
     lower
         :: Suitable f a
         => Unconstrained f a -> f a
@@ -291,14 +291,14 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     -- Alternatively, if your applicative is a 'Monad', 'lower' can be defined
     -- in terms of @('>>=')@, which is what 'lowerM' does.
     liftA2
-        :: (Suitable f a, Suitable f b, Suitable f c)
+        :: (Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys
         = lower (Control.Applicative.liftA2 f (eta xs) (eta ys))
     {-# INLINE liftA2 #-}
 
     liftA3
-        :: (Suitable f a, Suitable f b, Suitable f c, Suitable f d)
+        :: (Suitable f d)
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs
         = lower (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
@@ -306,7 +306,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
 
 infixl 4 <**>
 -- | A variant of '<*>' with the arguments reversed.
-(<**>) :: (Applicative f, Suitable f b, Suitable f (a -> b)) => f a -> f (a -> b) -> f b
+(<**>) :: (Applicative f, Suitable f b) => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 {-# INLINE (<**>) #-}
 

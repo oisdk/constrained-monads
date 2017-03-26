@@ -34,3 +34,13 @@ diceNoAdo n die' = probOf n $ do
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = uniform die'
+
+-- vectNoAdo :: Int -> Int -> Int -> Int
+-- vectNoAdo xs ys zs = sum $ do
+--   x <- enumFromN xs ys
+--   y <- enumFromN ys zs
+--   z <- enumFromN zs xs
+--   a <- enumFromN x y
+--   b <- enumFromN y z
+--   c <- enumFromN z x
+--   pure (x + y + z + a + b + c)
