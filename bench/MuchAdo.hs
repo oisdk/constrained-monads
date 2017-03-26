@@ -8,7 +8,7 @@ import           Data.Set
 import           Prob
 
 sumThriceAdoFinal :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoFinal xs ys zs = size . lowerFinal $ do
+sumThriceAdoFinal xs ys zs = size . phiFinal $ do
   x <- liftFinal (fromList xs)
   a <- liftFinal (fromList [0..x])
   y <- liftFinal (fromList ys)
@@ -23,7 +23,7 @@ sumThriceAdoFinal xs ys zs = size . lowerFinal $ do
   pure (x + a + y + b + z + c + t + u + v + g + h)
 
 sumThriceAdoConstrained :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoConstrained xs ys zs = size . lowerConstrained $ do
+sumThriceAdoConstrained xs ys zs = size . phiConstrained $ do
   x <- liftConstrained (fromList xs)
   a <- liftConstrained (fromList [0..x])
   y <- liftConstrained (fromList ys)
@@ -38,7 +38,7 @@ sumThriceAdoConstrained xs ys zs = size . lowerConstrained $ do
   pure (x + a + y + b + z + c + t + u + v + g + h)
 
 sumThriceAdoCodensity :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoCodensity xs ys zs = size . lowerCodensity $ do
+sumThriceAdoCodensity xs ys zs = size . phiCodensity $ do
   x <- liftCodensity (fromList xs)
   a <- liftCodensity (fromList [0..x])
   y <- liftCodensity (fromList ys)
@@ -53,7 +53,7 @@ sumThriceAdoCodensity xs ys zs = size . lowerCodensity $ do
   pure (x + a + y + b + z + c + t + u + v + g + h)
 
 diceAdoFinal :: Integer -> [Integer] -> Double
-diceAdoFinal n die' = probOf n . lowerFinal $ do
+diceAdoFinal n die' = probOf n . phiFinal $ do
   t <- die
   a <- liftFinal (upTo t)
   u <- die
@@ -66,7 +66,7 @@ diceAdoFinal n die' = probOf n . lowerFinal $ do
   where die = liftFinal (uniform die')
 
 diceAdoConstrained :: Integer -> [Integer] -> Double
-diceAdoConstrained n die' = probOf n . lowerConstrained $ do
+diceAdoConstrained n die' = probOf n . phiConstrained $ do
   t <- die
   a <- liftConstrained (upTo t)
   u <- die
@@ -79,7 +79,7 @@ diceAdoConstrained n die' = probOf n . lowerConstrained $ do
   where die = liftConstrained (uniform die')
 
 diceAdoCodensity :: Integer -> [Integer] -> Double
-diceAdoCodensity n die' = probOf n . lowerCodensity $ do
+diceAdoCodensity n die' = probOf n . phiCodensity $ do
   t <- die
   a <- liftCodensity (upTo t)
   u <- die

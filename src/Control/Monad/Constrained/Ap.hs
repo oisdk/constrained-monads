@@ -15,20 +15,20 @@ module Control.Monad.Constrained.Ap
   ,ifThenElse
   ,(>>)
   ,Constrained.eta
-  ,Constrained.lower
+  ,Constrained.phi
   ,liftFinal
-  ,lowerFinal
+  ,phiFinal
   ,liftInitial
-  ,lowerInitial
+  ,phiInitial
   ,liftConstrained
-  ,lowerConstrained
+  ,phiConstrained
   ,liftCodensity
-  ,lowerCodensity
+  ,phiCodensity
   ,module RestPrelude)
   where
 
 import qualified Control.Monad.Constrained        as Constrained
-import           Control.Monad.Constrained (lower)
+import           Control.Monad.Constrained (phi)
 
 import           GHC.Exts
 
@@ -96,9 +96,9 @@ class Monad f => MonadFail f where
 instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
          Monad (Initial.Ap f) where
     type Suitable (Initial.Ap f) a = Constrained.Suitable f a
-    (>>=) ap f = Initial.liftAp (lower ap Constrained.>>= (lower . f))
+    (>>=) ap f = Initial.liftAp (phi ap Constrained.>>= (phi . f))
     {-# INLINE (>>=) #-}
-    join = Initial.liftAp . go lower
+    join = Initial.liftAp . go phi
       where
         go
             :: forall a f b.
@@ -111,9 +111,9 @@ instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
 instance (Constrained.Monad f) =>
          Monad (Final.Ap f) where
     type Suitable (Final.Ap f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
-    (>>=) ap f = Final.liftAp (lowerFinal ap Constrained.>>= (lowerFinal . f))
+    (>>=) ap f = Final.liftAp (phiFinal ap Constrained.>>= (phiFinal . f))
     {-# INLINE (>>=) #-}
-    join = Final.liftAp . Constrained.join . lowerFinal . fmap lowerFinal
+    join = Final.liftAp . Constrained.join . phiFinal . fmap phiFinal
     {-# INLINE join #-}
 
 newtype Codensity f a = Codensity
@@ -133,9 +133,9 @@ instance Applicative (Codensity f) where
 
 instance (Constrained.Monad f) => Monad (Codensity f) where
   type Suitable (Codensity f) a = Constrained.Suitable f a
-  m >>= k = liftCodensity (lowerCodensity m Constrained.>>= (lowerCodensity . k))
+  m >>= k = liftCodensity (phiCodensity m Constrained.>>= (phiCodensity . k))
   {-# INLINE (>>=) #-}
-  join (Codensity xs) = Codensity (Constrained.=<< xs lowerCodensity)
+  join (Codensity xs) = Codensity (Constrained.=<< xs phiCodensity)
   {-# INLINE join #-}
 
 newtype ConstrainedWrapper f a
@@ -146,11 +146,11 @@ liftConstrained :: Constrained.Applicative f => f a -> ConstrainedWrapper f a
 liftConstrained = ConstrainedWrapper . Constrained.eta
 {-# INLINE liftConstrained #-}
 
-lowerConstrained
+phiConstrained
     :: (Constrained.Suitable f a, Constrained.Applicative f)
     => ConstrainedWrapper f a -> f a
-lowerConstrained (ConstrainedWrapper xs) = Constrained.lower xs
-{-# INLINE lowerConstrained #-}
+phiConstrained (ConstrainedWrapper xs) = Constrained.phi xs
+{-# INLINE phiConstrained #-}
 
 instance Constrained.Applicative f =>
          Functor (ConstrainedWrapper f) where
@@ -170,38 +170,38 @@ instance Constrained.Monad f =>
     type Suitable (ConstrainedWrapper f) a
         = (Constrained.Suitable f a, Constrained.Suitable f (f a))
     ConstrainedWrapper xs >>= f =
-        liftConstrained (lower xs Constrained.>>= (lowerConstrained . f))
+        liftConstrained (phi xs Constrained.>>= (phiConstrained . f))
     {-# INLINE (>>=) #-}
     join =
         liftConstrained .
-        Constrained.join . lowerConstrained . fmap lowerConstrained
+        Constrained.join . phiConstrained . fmap phiConstrained
     {-# INLINE join #-}
 
 liftFinal :: f a -> Final.Ap f a
 liftFinal = Final.liftAp
 {-# INLINE liftFinal #-}
 
-lowerFinal
+phiFinal
     :: (Constrained.Applicative f, Constrained.Suitable f a)
     => Final.Ap f a -> f a
-lowerFinal = lower . Final.runAp Constrained.eta
-{-# INLINE lowerFinal #-}
+phiFinal = phi . Final.runAp Constrained.eta
+{-# INLINE phiFinal #-}
 
 liftInitial :: f a -> Initial.Ap f a
 liftInitial = Initial.liftAp
 
-lowerInitial
+phiInitial
     :: (Constrained.Applicative f, Constrained.Suitable f a)
     => Initial.Ap f a -> f a
-lowerInitial = lower . Initial.runAp Constrained.eta
+phiInitial = phi . Initial.runAp Constrained.eta
 
 liftCodensity :: Constrained.Monad f => f a -> Codensity f a
 liftCodensity xs = Codensity (xs Constrained.>>=)
 
-lowerCodensity
+phiCodensity
     :: (Constrained.Suitable f a, Constrained.Applicative f)
     => Codensity f a -> f a
-lowerCodensity (Codensity fs) = fs Constrained.pure
+phiCodensity (Codensity fs) = fs Constrained.pure
 
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a

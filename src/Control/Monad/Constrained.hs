@@ -31,7 +31,7 @@ module Control.Monad.Constrained
    -- * Unconstrained applicative stuff
   Ap(..)
   ,Initial.retractAp
-  ,lowerM
+  ,phiM
   ,Initial.liftAp
   ,Initial.hoistAp
   ,
@@ -75,15 +75,15 @@ import qualified Prelude
 import           Data.Functor.Identity            (Identity (..))
 
 import           Data.Array                       (Array, Ix)
-import           Data.Array.Unboxed               (UArray, IArray, amap)
+-- import           Data.Array.Unboxed               (UArray, IArray, amap)
 import           Data.IntMap.Strict               (IntMap)
 import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import           Data.Tree                        (Tree (..))
-import qualified Data.Vector.Storable             as StorableVec
-import qualified Data.Vector.Unboxed              as UnboxedVec
+-- import qualified Data.Vector.Storable             as StorableVec
+-- import qualified Data.Vector.Unboxed              as UnboxedVec
 
 import           Control.Monad.ST                 (ST)
 import           Control.Monad.Trans.Cont         (ContT)
@@ -104,7 +104,7 @@ import           Data.Tuple
 
 import           Control.Applicative.Free         (Ap (Ap, Pure))
 import qualified Control.Applicative.Free         as Initial
-import qualified Control.Applicative.Free.Final   as Final
+-- import qualified Control.Applicative.Free.Final   as Final
 
 --------------------------------------------------------------------------------
 -- Standard classes
@@ -157,12 +157,12 @@ class Functor f  where
 
     -- | Maps a function over a functor
     fmap
-        :: (Suitable f a, Suitable f b)
+        :: (Suitable f b)
         => (a -> b) -> f a -> f b
 
     -- | Replace all values in the input with a default value.
     infixl 4 <$
-    (<$) :: (Suitable f a, Suitable f b) => a -> f b -> f a
+    (<$) :: (Suitable f a) => a -> f b -> f a
     (<$) = fmap . const
     {-# INLINE (<$) #-}
 
@@ -174,7 +174,7 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- provided in the Prelude. This is to facilitate the lifting of functions
 -- to arbitrary numbers of arguments.
 --
--- A minimal complete definition must include implementations of 'lower'
+-- A minimal complete definition must include implementations of 'phi'
 -- functions satisfying the following laws:
 --
 -- [/identity/]
@@ -213,24 +213,24 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
-    {-# MINIMAL eta, lower #-}
+    {-# MINIMAL eta, phi #-}
     eta
         :: f a -> Unconstrained f a
-    lower
+    phi
         :: Suitable f a
         => Unconstrained f a -> f a
     -- | Lift a value.
     pure
         :: Suitable f a
         => a -> f a
-    pure = lower . Prelude.pure
+    pure = phi . Prelude.pure
     {-# INLINE pure #-}
     infixl 4 <*>
     -- | Sequential application.
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    (<*>) fs xs = lower (eta fs Prelude.<*> eta xs)
+    (<*>) fs xs = phi (eta fs Prelude.<*> eta xs)
     {-# INLINE (<*>) #-}
     infixl 4 *>
     -- | Sequence actions, discarding the value of the first argument.
@@ -270,7 +270,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     --    y <- ys
     --    'pure' (f x y)@
     --
-    -- But now we can't define the 'lower' functions for things which are
+    -- But now we can't define the 'phi' functions for things which are
     -- 'Applicative' but not 'Monad' (square matrices,
     -- 'Control.Applicative.ZipList's, etc). Also, some types have a more
     -- efficient @('<*>')@ than @('>>=')@ (see, for instance, the
@@ -278,30 +278,30 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     -- monad).
     --
     -- The one missing piece is @-XApplicativeDo@: I can't figure out a way
-    -- to get do-notation to desugar to using the 'lower' functions, rather
+    -- to get do-notation to desugar to using the 'phi' functions, rather
     -- than @('<*>')@.
     --
     -- From some preliminary performance testing, it seems that this approach
     -- has /no/ performance overhead.
     --
     -- Utility definitions of this function are provided: if your 'Applicative'
-    -- is a @Prelude.'Prelude.Applicative'@, 'lower' can be defined in terms of
+    -- is a @Prelude.'Prelude.Applicative'@, 'phi' can be defined in terms of
     -- @('<*>')@. 'retractAp' does exactly this.
     --
-    -- Alternatively, if your applicative is a 'Monad', 'lower' can be defined
-    -- in terms of @('>>=')@, which is what 'lowerM' does.
+    -- Alternatively, if your applicative is a 'Monad', 'phi' can be defined
+    -- in terms of @('>>=')@, which is what 'phiM' does.
     liftA2
         :: (Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
     liftA2 f xs ys
-        = lower (Control.Applicative.liftA2 f (eta xs) (eta ys))
+        = phi (Control.Applicative.liftA2 f (eta xs) (eta ys))
     {-# INLINE liftA2 #-}
 
     liftA3
         :: (Suitable f d)
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs
-        = lower (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
+        = phi (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
     {-# INLINE liftA3 #-}
 
 infixl 4 <**>
@@ -310,13 +310,13 @@ infixl 4 <**>
 (<**>) = liftA2 (flip ($))
 {-# INLINE (<**>) #-}
 
--- | A definition of 'lower' that uses monadic operations.
-lowerM :: (Monad f, Suitable f a) => Initial.Ap f a -> f a
-lowerM = go pure where
+-- | A definition of 'phi' that uses monadic operations.
+phiM :: (Monad f, Suitable f a) => Initial.Ap f a -> f a
+phiM = go pure where
   go :: (Suitable f b, Monad f) => (a -> f b) -> Initial.Ap f a -> f b
   go f (Pure x) = f x
   go f (Ap x xs) = x >>= \y -> go (\c -> (f . c) y) xs
-{-# INLINE lowerM #-}
+{-# INLINE phiM #-}
 
 {- | The 'Monad' class defines the basic operations over a /monad/,
 a concept from a branch of mathematics known as /category theory/.
@@ -530,7 +530,7 @@ infixl 4 <$>
 -- >>> even <$> (2,2)
 -- (2,True)
 --
-(<$>) :: (Functor f, Suitable f a, Suitable f b) => (a -> b) -> f a -> f b
+(<$>) :: (Functor f, Suitable f b) => (a -> b) -> f a -> f b
 (<$>) = fmap
 {-# INLINE (<$>) #-}
 
@@ -683,7 +683,7 @@ replicateM cnt0 f =
 -- >>> void $ traverse print [1,2]
 -- 1
 -- 2
-void :: (Functor f, Suitable f (), Suitable f a) => f a -> f ()
+void :: (Functor f, Suitable f ()) => f a -> f ()
 void = (<$) ()
 
 -- | Collapse one monadic layer.
@@ -729,7 +729,7 @@ instance Functor [] where
 type instance Unconstrained [] = []
 
 instance Applicative [] where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -737,7 +737,7 @@ instance Applicative [] where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE lower #-}
+    {-# INLINE phi #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -767,7 +767,7 @@ instance Functor Maybe where
 type instance Unconstrained Maybe = Maybe
 
 instance Applicative Maybe where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -798,7 +798,7 @@ instance Functor IO where
 type instance Unconstrained IO = IO
 
 instance Applicative IO where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -825,7 +825,7 @@ instance Functor Identity where
 type instance Unconstrained Identity = Identity
 
 instance Applicative Identity where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -848,7 +848,7 @@ instance Functor (Either e) where
 type instance Unconstrained (Either a) = Either a
 
 instance Applicative (Either a) where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -898,8 +898,8 @@ instance Applicative Set where
     {-# INLINE (*>) #-}
     xs <* ys = if null ys then Set.empty else xs
     {-# INLINE (<*) #-}
-    lower (List xs) = xs (flip Set.insert) Set.empty
-    {-# INLINE lower #-}
+    phi (List xs) = xs (flip Set.insert) Set.empty
+    {-# INLINE phi #-}
     eta xs = List (\f b -> Set.foldl' f b xs)
     {-# INLINE eta #-}
 
@@ -921,23 +921,23 @@ instance Functor (Array i) where
 
 instance Ix i =>
          Traversable (Array i) where
-    traverse f = lower . Prelude.traverse (eta . f)
+    traverse f = phi . Prelude.traverse (eta . f)
 
-instance Ix i => Functor (UArray i) where
-    type Suitable (UArray i) a = IArray UArray a
-    fmap = amap
+-- instance Ix i => Functor (UArray i) where
+--     type Suitable (UArray i) a = IArray UArray a
+--     fmap = amap
 
-instance Functor UnboxedVec.Vector where
-    type Suitable UnboxedVec.Vector a = UnboxedVec.Unbox a
-    fmap = UnboxedVec.map
+-- instance Functor UnboxedVec.Vector where
+--     type Suitable UnboxedVec.Vector a = UnboxedVec.Unbox a
+--     fmap = UnboxedVec.map
 
 -- newtype VecUnfold a
 
-type instance Unconstrained UnboxedVec.Vector = Final.Ap UnboxedVec.Vector
+-- type instance Unconstrained UnboxedVec.Vector = Final.Ap UnboxedVec.Vector
 
 -- instance Applicative UnboxedVec.Vector where
 --   eta = Final.liftAp
---   lower xs = Final.runAp 
+--   phi xs = Final.runAp 
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
@@ -952,7 +952,7 @@ instance Functor ((,) a) where
 type instance Unconstrained ((,) a) = ((,) a)
 
 instance Monoid a => Applicative ((,) a) where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -980,7 +980,7 @@ instance Functor Seq where
 type instance Unconstrained Seq = Seq
 
 instance Applicative Seq where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -1007,7 +1007,7 @@ instance Functor Tree where
 type instance Unconstrained Tree = Tree
 
 instance Applicative Tree where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -1022,7 +1022,7 @@ instance Monad Tree where
 instance Traversable Tree where
     traverse f (Node x ts) =
         let g = (eta . f)
-        in lower
+        in phi
                (Node Prelude.<$> g x Prelude.<*>
                 Prelude.traverse (Prelude.traverse g) ts)
 
@@ -1034,7 +1034,7 @@ instance Functor ((->) a) where
 type instance Unconstrained ((->) a) = ((->) a)
 
 instance Applicative ((->) a) where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -1054,7 +1054,7 @@ instance Functor (ContT r m) where
 type instance Unconstrained (ContT r m) = ContT r m
 
 instance Applicative (ContT r m) where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -1075,7 +1075,7 @@ type instance Unconstrained Control.Applicative.ZipList =
      Control.Applicative.ZipList
 
 instance Applicative Control.Applicative.ZipList where
-    lower = id
+    phi = id
     eta = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
@@ -1128,8 +1128,8 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
             (_,!s'') <- ys s'
             pure (x, s'')
     {-# INLINE (<*) #-}
-    lower (Strict.StateT xs) = Strict.StateT (lower . xs)
-    {-# INLINE lower #-}
+    phi (Strict.StateT xs) = Strict.StateT (phi . xs)
+    {-# INLINE phi #-}
 
 instance (Monad m, Alternative m, Prelude.Monad (Unconstrained m)) =>
          Alternative (Strict.StateT s m) where
@@ -1185,7 +1185,7 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
             ~(x,s') <- xs s
             ~(_,s'') <- ys s'
             pure (x,s'')
-    lower (StateT xs) = StateT (lower . xs)
+    phi (StateT xs) = StateT (phi . xs)
 
 instance (Monad m, Alternative m, Prelude.Monad (Unconstrained m)) =>
          Alternative (StateT s m) where
@@ -1218,8 +1218,8 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     {-# INLINE pure #-}
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
-    lower ys = ReaderT (lower . runReaderT ys)
-    {-# INLINE lower #-}
+    phi ys = ReaderT (phi . runReaderT ys)
+    {-# INLINE phi #-}
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1256,7 +1256,7 @@ instance (Prelude.Monad (Unconstrained m), Monad m) =>
     eta (MaybeT x) = MaybeT (eta x)
     pure x = MaybeT (pure (Just x))
     MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
-    lower (MaybeT x) = MaybeT (lower x)
+    phi (MaybeT x) = MaybeT (phi x)
     MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
     MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
 
@@ -1288,7 +1288,7 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
 
     pure x = ExceptT (pure (Right x))
     ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
-    lower (ExceptT xs) = ExceptT (lower xs)
+    phi (ExceptT xs) = ExceptT (phi xs)
     ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
     ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
 
@@ -1324,9 +1324,9 @@ instance Applicative m =>
     (<*>) =
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
-    lower =
+    phi =
         (coerce :: (Unconstrained f b -> f b) -> (IdentityT (Unconstrained f) b -> IdentityT f b))
-            lower
+            phi
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
 
@@ -1348,7 +1348,7 @@ instance Functor (ST s) where
 type instance Unconstrained (ST s) = ST s
 
 instance Applicative (ST s) where
-    lower = id
+    phi = id
     eta = id
 
 instance Monad (ST s) where
@@ -1362,7 +1362,7 @@ instance Functor (Const a) where
 type instance Unconstrained (Const a) = Const a
 
 instance Monoid a => Applicative (Const a) where
-    lower = id
+    phi = id
     eta = id
 
 instance (Functor f, Functor g) =>
@@ -1375,7 +1375,7 @@ type instance Unconstrained (Compose f g) =
 
 instance (Applicative f, Applicative g) =>
          Applicative (Compose f g) where
-  lower (Compose xs) = Compose (lower (Prelude.fmap lower xs))
+  phi (Compose xs) = Compose (phi (Prelude.fmap phi xs))
   eta (Compose xs) = Compose (Prelude.fmap eta (eta xs))
 
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
@@ -1393,7 +1393,7 @@ instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
-    lower (Pair xs ys) = Pair (lower xs) (lower ys)
+    phi (Pair xs ys) = Pair (phi xs) (phi ys)
     eta (Pair xs ys) = Pair (eta xs) (eta ys)
 
 instance (Alternative f, Alternative g) => Alternative (Product f g) where

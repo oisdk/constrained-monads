@@ -169,7 +169,7 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
-    lower = lowerM
+    phi = phiM
     eta = liftAp
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>

@@ -77,7 +77,7 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    lower = lowerM
+    phi = phiM
     eta = liftAp
 
 type instance Unconstrained IntSet = Ap IntSet

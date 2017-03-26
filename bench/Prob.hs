@@ -57,8 +57,8 @@ type instance Unconstrained Prob = Dist
 instance Applicative Prob where
     eta = Dist . map (uncurry (:!:)) . Map.toList . runProb
     {-# INLINE eta #-}
-    lower = Prob . Map.fromListWith (+) . map (\(x :!: y) -> (x,y)) . runDist
-    {-# INLINE lower #-}
+    phi = Prob . Map.fromListWith (+) . map (\(x :!: y) -> (x,y)) . runDist
+    {-# INLINE phi #-}
     _ *> x = x
     {-# INLINE (*>) #-}
     x <* _ = x
