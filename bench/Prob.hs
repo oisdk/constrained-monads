@@ -21,30 +21,25 @@ newtype Prob a
 
 newtype Dist a
   = Dist
-  { runDist :: [Weighted a]
+  { runDist :: [(a,Double)]
   } deriving (Prelude.Functor, Monoid)
 
-data Weighted a =
-    (:!:) !a
-          {-# UNPACK #-} !Double
-    deriving (Prelude.Functor)
-
 instance Prelude.Applicative Dist where
-  pure x = Dist [x :!: 1]
+  pure x = Dist [(x , 1)]
   {-# INLINE pure #-}
   Dist fs <*> Dist xs
     = Dist
-    [ f x :!: (fp * xp)
-    | (f :!: fp) <- fs
-    , (x :!: xp) <- xs ]
+    [ (f x, fp * xp)
+    | (f , fp) <- fs
+    , (x , xp) <- xs ]
   {-# INLINE (<*>) #-}
 
 instance Prelude.Monad Dist where
   Dist xs >>= f
     = Dist
-    [ y :!: (xp * yp)
-    | (x :!: xp) <- xs
-    , (y :!: yp) <- runDist (f x) ]
+    [ (y, xp * yp)
+    | (x , xp) <- xs
+    , (y , yp) <- runDist (f x) ]
   {-# INLINE (>>=) #-}
 
 instance Functor Prob where
@@ -55,9 +50,9 @@ instance Functor Prob where
 type instance Unconstrained Prob = Dist
 
 instance Applicative Prob where
-    eta = Dist . map (uncurry (:!:)) . Map.toList . runProb
+    eta = Dist . map (uncurry (,)) . Map.toList . runProb
     {-# INLINE eta #-}
-    phi = Prob . Map.fromListWith (+) . map (\(x :!: y) -> (x,y)) . runDist
+    phi = Prob . Map.fromListWith (+) . map (\(x , y) -> (x,y)) . runDist
     {-# INLINE phi #-}
     _ *> x = x
     {-# INLINE (*>) #-}
@@ -69,7 +64,12 @@ scaled (Prob xs) n = Prob (Map.map (n*) xs)
 {-# INLINE scaled #-}
 
 instance Monad Prob where
-    Prob xs >>= f = Map.foldMapWithKey (scaled . f) xs
+    Prob xs >>= f =
+        Map.foldlWithKey'
+            (\a x p ->
+                  combScale p a (f x))
+            mempty
+            xs
     {-# INLINE (>>=) #-}
 
 instance (Ord a) =>
@@ -79,12 +79,27 @@ instance (Ord a) =>
     mappend (Prob xs) (Prob ys) = Prob (Map.unionWith (+) xs ys)
     {-# INLINE mappend #-}
 
+combScale
+    :: (Ord a)
+    => Double -> Prob a -> Prob a -> Prob a
+combScale p (Prob xs) (Prob ys) =
+    Prob
+        (Map.mergeWithKey
+             (\_ x y ->
+                   Just $ x + p * y)
+             id
+             (Map.map (p *))
+             xs
+             ys)
+{-# INLINE combScale #-}
+
 instance Foldable Prob where
     foldMap f (Prob xs) =
         Map.foldMapWithKey
             (\k _ ->
                   f k)
             xs
+    {-# INLINE foldMap #-}
 
 uniform
     :: (Ord a)

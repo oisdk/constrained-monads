@@ -56,12 +56,19 @@ benchmark bench
   other-modules:       MuchAdo
                      , NoAdo
                      , Prob
+                     , EnumVect
   ghc-options:         -O2 -rtsopts -threaded
 
   build-depends:       base >= 4.8
                      , constrained-monads >= 0.4.1
                      , criterion >= 0.6
                      , containers >= 0.5
+                     , smallcheck >= 1.1.1
+                     , QuickCheck >= 2.8
+                     , vector >= 0.11
+                     , transformers >= 0.5
+                     , nat-sized-numbers >= 0.2
+                     , deepseq >= 1.4
 
 
 source-repository head

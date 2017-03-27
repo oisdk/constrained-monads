@@ -1,11 +1,13 @@
 {-# LANGUAGE RebindableSyntax #-}
-
+{-# LANGUAGE DataKinds        #-}
 
 module NoAdo where
 
 import           Control.Monad.Constrained
 import           Data.Set
+import           EnumVect
 import           Prob
+import           Numeric.Sized.WordOfSize
 
 sumThriceNoAdo :: [Integer] -> [Integer] -> [Integer] -> Int
 sumThriceNoAdo xs ys zs = size $ do
@@ -34,3 +36,14 @@ diceNoAdo n die' = probOf n $ do
   z <- die
   pure (a + t + u + x + y + z + v + w)
   where die = uniform die'
+
+diceVectNoAdo :: WordOfSize 3 -> [WordOfSize 3] -> Double
+diceVectNoAdo n die' = probOfV n $ do
+  t <- die
+  a <- upToV t
+  u <- die
+  w <- die
+  v <- upToV u
+  y <- upToV w
+  pure (a + t + u + y + v + w)
+  where die = uniformV die'
