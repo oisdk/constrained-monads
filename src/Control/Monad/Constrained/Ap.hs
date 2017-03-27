@@ -99,7 +99,7 @@ instance (Constrained.Monad f) =>
                (Constrained.Suitable f b, Constrained.Monad f)
             => (a -> f b) -> Initial f a -> f b
         go c (Initial.Pure x) = c x
-        go f (Initial.Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
+        go f (Initial.Ap x xs) = x Constrained.>>= \y -> go (\c -> (f . c) y) xs
     {-# INLINE join #-}
 
 type Initial = Initial.Ap

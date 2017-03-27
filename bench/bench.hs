@@ -16,7 +16,16 @@ instance KnownNat n => NFData (WordOfSize n)
 main :: IO ()
 main =
     defaultMain
-        [ env (pure ([1..6],30)) $
+        [ env (pure ([1..7],[1..4],[1])) $
+          \ ~(xs,ys,zs) ->
+               bgroup
+                   "set"
+                   [ bench "Ado Final      " $ whnf (sumThriceAdoFinal       xs ys) zs
+                   -- , bench "Ado Initial    " $ whnf (sumThriceAdoInitial     xs ys) zs
+                   , bench "Ado Constrained" $ whnf (sumThriceAdoConstrained xs ys) zs
+                   , bench "Ado Codensity  " $ whnf (sumThriceAdoCodensity   xs ys) zs
+                   , bench "Do             " $ whnf (sumThriceNoAdo          xs ys) zs]
+        , env (pure ([1..6],30)) $
           \ ~(xs,n) ->
                bgroup
                    "prob map"
@@ -30,15 +39,6 @@ main =
                bgroup
                    "prob vect"
                    [ bench "Ado Initial    " $ whnf (diceVectAdoInitial     n) xs
-                   , bench "Ado Codensity  " $ whnf (diceVectAdoCodensity   n) xs
+                   -- , bench "Ado Codensity  " $ whnf (diceVectAdoCodensity   n) xs
                    , bench "Do             " $ whnf (diceVectNoAdo          n) xs ]
-        , env (pure ([1..7],[1..4],[1])) $
-          \ ~(xs,ys,zs) ->
-               bgroup
-                   "set"
-                   [ bench "Ado Final      " $ whnf (sumThriceAdoFinal       xs ys) zs
-                   , bench "Ado Initial    " $ whnf (sumThriceAdoInitial     xs ys) zs
-                   , bench "Ado Constrained" $ whnf (sumThriceAdoConstrained xs ys) zs
-                   , bench "Ado Codensity  " $ whnf (sumThriceAdoCodensity   xs ys) zs
-                   , bench "Do             " $ whnf (sumThriceNoAdo          xs ys) zs]
         ]
