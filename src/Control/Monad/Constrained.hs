@@ -74,7 +74,6 @@ import qualified Prelude
 
 import           Data.Functor.Identity            (Identity (..))
 
-import           Data.Array                       (Array, Ix)
 import           Data.IntMap.Strict               (IntMap)
 import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
@@ -907,31 +906,6 @@ instance MonadFail Set where
 instance Alternative Set where
     empty = Set.empty
     (<|>) = Set.union
-
-instance Functor (Array i) where
-    type Suitable (Array i) a = ()
-    fmap = Prelude.fmap
-    (<$) = (Prelude.<$)
-
-instance Ix i =>
-         Traversable (Array i) where
-    traverse f = phi . Prelude.traverse (eta . f)
-
--- instance Ix i => Functor (UArray i) where
---     type Suitable (UArray i) a = IArray UArray a
---     fmap = amap
-
--- instance Functor UnboxedVec.Vector where
---     type Suitable UnboxedVec.Vector a = UnboxedVec.Unbox a
---     fmap = UnboxedVec.map
-
--- newtype VecUnfold a
-
--- type instance Unconstrained UnboxedVec.Vector = Final.Ap UnboxedVec.Vector
-
--- instance Applicative UnboxedVec.Vector where
---   eta = Final.liftAp
---   phi xs = Final.runAp 
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
