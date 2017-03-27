@@ -3,6 +3,8 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | This module allows the use of the Applicative Do extension with
 -- constrained monads.
@@ -14,21 +16,13 @@ module Control.Monad.Constrained.Ap
   ,return
   ,ifThenElse
   ,(>>)
-  ,Constrained.eta
-  ,Constrained.phi
-  ,liftFinal
-  ,phiFinal
-  ,liftInitial
-  ,phiInitial
-  ,liftConstrained
-  ,phiConstrained
-  ,liftCodensity
-  ,phiCodensity
+  ,Initial
+  ,Final
+  ,FreeApplicative(..)
   ,module RestPrelude)
   where
 
 import qualified Control.Monad.Constrained        as Constrained
-import           Control.Monad.Constrained (phi)
 
 import           GHC.Exts
 
@@ -93,9 +87,9 @@ class Monad f => MonadFail f where
   -- | Called when a pattern match fails in do-notation.
   fail :: Suitable f a => String -> f a
 
-instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
-         Monad (Initial.Ap f) where
-    type Suitable (Initial.Ap f) a = Constrained.Suitable f a
+instance (Constrained.Monad f) =>
+         Monad (Initial f) where
+    type Suitable (Initial f) a = Constrained.Suitable f a
     (>>=) ap f = Initial.liftAp (phi ap Constrained.>>= (phi . f))
     {-# INLINE (>>=) #-}
     join = Initial.liftAp . go phi
@@ -103,17 +97,20 @@ instance (Constrained.Monad f, Constrained.Unconstrained f ~ Initial.Ap f) =>
         go
             :: forall a f b.
                (Constrained.Suitable f b, Constrained.Monad f)
-            => (a -> f b) -> Initial.Ap f a -> f b
+            => (a -> f b) -> Initial f a -> f b
         go c (Initial.Pure x) = c x
         go f (Initial.Ap x xs) = x Constrained.>>= (\xx -> go (\c -> (f . c) xx) xs)
     {-# INLINE join #-}
 
+type Initial = Initial.Ap
+type Final = Final.Ap
+
 instance (Constrained.Monad f) =>
-         Monad (Final.Ap f) where
-    type Suitable (Final.Ap f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
-    (>>=) ap f = Final.liftAp (phiFinal ap Constrained.>>= (phiFinal . f))
+         Monad (Final f) where
+    type Suitable (Final f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
+    (>>=) ap f = Final.liftAp (phi ap Constrained.>>= (phi . f))
     {-# INLINE (>>=) #-}
-    join = Final.liftAp . Constrained.join . phiFinal . fmap phiFinal
+    join = Final.liftAp . Constrained.join . phi . fmap phi
     {-# INLINE join #-}
 
 newtype Codensity f a = Codensity
@@ -133,24 +130,24 @@ instance Applicative (Codensity f) where
 
 instance (Constrained.Monad f) => Monad (Codensity f) where
   type Suitable (Codensity f) a = Constrained.Suitable f a
-  m >>= k = liftCodensity (phiCodensity m Constrained.>>= (phiCodensity . k))
+  m >>= k = eta (phi m Constrained.>>= (phi . k))
   {-# INLINE (>>=) #-}
-  join (Codensity xs) = Codensity (Constrained.=<< xs phiCodensity)
+  join (Codensity xs) = Codensity (Constrained.=<< xs phi)
   {-# INLINE join #-}
+
+class FreeApplicative ap f where
+  eta :: f a -> ap f a
+  phi :: (Constrained.Suitable f a) => ap f a -> f a
 
 newtype ConstrainedWrapper f a
   = ConstrainedWrapper
   { unwrapConstrained :: Constrained.Unconstrained f a }
 
-liftConstrained :: Constrained.Applicative f => f a -> ConstrainedWrapper f a
-liftConstrained = ConstrainedWrapper . Constrained.eta
-{-# INLINE liftConstrained #-}
-
-phiConstrained
-    :: (Constrained.Suitable f a, Constrained.Applicative f)
-    => ConstrainedWrapper f a -> f a
-phiConstrained (ConstrainedWrapper xs) = Constrained.phi xs
-{-# INLINE phiConstrained #-}
+instance Constrained.Applicative f => FreeApplicative ConstrainedWrapper f where
+  eta = ConstrainedWrapper . Constrained.eta
+  {-# INLINE eta #-}
+  phi (ConstrainedWrapper xs) = Constrained.phi xs
+  {-# INLINE phi #-}
 
 instance Constrained.Applicative f =>
          Functor (ConstrainedWrapper f) where
@@ -170,38 +167,30 @@ instance Constrained.Monad f =>
     type Suitable (ConstrainedWrapper f) a
         = (Constrained.Suitable f a, Constrained.Suitable f (f a))
     ConstrainedWrapper xs >>= f =
-        liftConstrained (phi xs Constrained.>>= (phiConstrained . f))
+        eta (Constrained.phi xs Constrained.>>= (phi . f))
     {-# INLINE (>>=) #-}
     join =
-        liftConstrained .
-        Constrained.join . phiConstrained . fmap phiConstrained
+        eta .
+        Constrained.join . phi . fmap phi
     {-# INLINE join #-}
 
-liftFinal :: f a -> Final.Ap f a
-liftFinal = Final.liftAp
-{-# INLINE liftFinal #-}
+instance Constrained.Applicative f => FreeApplicative Final f where
+  eta = Final.liftAp
+  {-# INLINE eta #-}
+  phi = Constrained.phi . Final.runAp Constrained.eta
+  {-# INLINE phi #-}
 
-phiFinal
-    :: (Constrained.Applicative f, Constrained.Suitable f a)
-    => Final.Ap f a -> f a
-phiFinal = phi . Final.runAp Constrained.eta
-{-# INLINE phiFinal #-}
+instance Constrained.Applicative f => FreeApplicative Initial f where
+  eta = Initial.liftAp
+  {-# INLINE eta #-}
+  phi = Constrained.phi . Initial.runAp Constrained.eta
+  {-# INLINE phi #-}
 
-liftInitial :: f a -> Initial.Ap f a
-liftInitial = Initial.liftAp
-
-phiInitial
-    :: (Constrained.Applicative f, Constrained.Suitable f a)
-    => Initial.Ap f a -> f a
-phiInitial = phi . Initial.runAp Constrained.eta
-
-liftCodensity :: Constrained.Monad f => f a -> Codensity f a
-liftCodensity xs = Codensity (xs Constrained.>>=)
-
-phiCodensity
-    :: (Constrained.Suitable f a, Constrained.Applicative f)
-    => Codensity f a -> f a
-phiCodensity (Codensity fs) = fs Constrained.pure
+instance Constrained.Monad f => FreeApplicative Codensity f where
+  eta xs = Codensity (xs Constrained.>>=)
+  {-# INLINE eta #-}
+  phi (Codensity fs) = fs Constrained.pure
+  {-# INLINE phi #-}
 
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a

@@ -30,8 +30,6 @@ library
                      , transformers >= 0.5
                      , array >= 0.5
                      , free >= 0.12
-                     , constraints >= 0.8
-                     , vector >= 0.11
   default-language:    Haskell2010
   ghc-options:         -Wall
 

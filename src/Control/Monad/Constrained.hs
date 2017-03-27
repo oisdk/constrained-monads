@@ -75,15 +75,12 @@ import qualified Prelude
 import           Data.Functor.Identity            (Identity (..))
 
 import           Data.Array                       (Array, Ix)
--- import           Data.Array.Unboxed               (UArray, IArray, amap)
 import           Data.IntMap.Strict               (IntMap)
 import           Data.Map.Strict                  (Map)
 import           Data.Sequence                    (Seq)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import           Data.Tree                        (Tree (..))
--- import qualified Data.Vector.Storable             as StorableVec
--- import qualified Data.Vector.Unboxed              as UnboxedVec
 
 import           Control.Monad.ST                 (ST)
 import           Control.Monad.Trans.Cont         (ContT)
@@ -213,9 +210,8 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
-    {-# MINIMAL eta, phi #-}
-    eta
-        :: f a -> Unconstrained f a
+    {-# MINIMAL eta , phi #-}
+    eta :: f a -> Unconstrained f a
     phi
         :: Suitable f a
         => Unconstrained f a -> f a
@@ -293,15 +289,13 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     liftA2
         :: (Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
-    liftA2 f xs ys
-        = phi (Control.Applicative.liftA2 f (eta xs) (eta ys))
+    liftA2 f xs ys = phi (Control.Applicative.liftA2 f (eta xs) (eta ys))
     {-# INLINE liftA2 #-}
-
     liftA3
         :: (Suitable f d)
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-    liftA3 f xs ys zs
-        = phi (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
+    liftA3 f xs ys zs =
+        phi (Control.Applicative.liftA3 f (eta xs) (eta ys) (eta zs))
     {-# INLINE liftA3 #-}
 
 infixl 4 <**>

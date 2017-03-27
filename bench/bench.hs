@@ -5,27 +5,23 @@ import NoAdo
 
 import Criterion.Main
 
-xs, ys, zs :: [Integer]
-xs = [1..7]
-ys = [1..4]
-zs = [1..1]
-
 main :: IO ()
-main = defaultMain
-  [
-    bgroup "prob" [ bench "Ado Final"       $ whnf (diceAdoFinal       30) [1..6]
-                  , bench "Ado Constrained" $ whnf (diceAdoConstrained 30) [1..6]
-                  , bench "Ado Codensity"   $ whnf (diceAdoCodensity   30) [1..6]
-                  , bench "Do"              $ whnf (diceNoAdo          30) [1..6]
-                  ]
-  , bgroup "set"  [ bench "Ado Final"       $ whnf (sumThriceAdoFinal       xs ys) zs
-                  , bench "Ado Constrained" $ whnf (sumThriceAdoConstrained xs ys) zs
-                  , bench "Ado Codensity"   $ whnf (sumThriceAdoCodensity   xs ys) zs
-                  , bench "Do"              $ whnf (sumThriceNoAdo          xs ys) zs
-                  ]
-  -- , bgroup "vect" [ bench "Ado Final"       $ whnf (vectAdoFinal       5 6) 7
-  --                 , bench "Ado Constrained" $ whnf (vectAdoConstrained 5 6) 7
-  --                 , bench "Ado Codensity"   $ whnf (vectAdoCodensity   5 6) 7
-  --                 , bench "Do"              $ whnf (vectNoAdo          5 6) 7
-  --                 ]
-  ]
+main =
+    defaultMain
+        [ env (pure ([1..6],30)) $
+          \ ~(xs,n) ->
+               bgroup
+                   "prob"
+                   [ bench "Ado Final      " $ whnf (diceAdoFinal       n) xs
+                   , bench "Ado Constrained" $ whnf (diceAdoConstrained n) xs
+                   , bench "Ado Codensity  " $ whnf (diceAdoCodensity   n) xs
+                   , bench "Do             " $ whnf (diceNoAdo          n) xs]
+        , env (pure ([1..7],[1..4],[1])) $
+          \ ~(xs,ys,zs) ->
+               bgroup
+                   "set"
+                   [ bench "Ado Final      " $ whnf (sumThriceAdoFinal       xs ys) zs
+                   , bench "Ado Constrained" $ whnf (sumThriceAdoConstrained xs ys) zs
+                   , bench "Ado Codensity  " $ whnf (sumThriceAdoCodensity   xs ys) zs
+                   , bench "Do             " $ whnf (sumThriceNoAdo          xs ys) zs]
+        ]
