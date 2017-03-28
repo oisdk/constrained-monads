@@ -16,42 +16,28 @@ instance KnownNat n => NFData (WordOfSize n)
 main :: IO ()
 main =
     defaultMain
-        [ env (pure ([1 .. 7], [1 .. 4], [1])) $
-          \ ~(xs,ys,zs) ->
-               bgroup
-                   "set"
-                   [ bench "Applicative rewriting, Final encoding" $
-                     whnf (sumThriceAdoFinal xs ys) zs
-                   ,
-                     -- , bench "Applicative Rewriting Initial    " $ whnf (sumThriceApplicative RewritingInitial     xs ys) zs
-                     bench
-                         "Applicative rewriting, Constrained encoding" $
-                     whnf (sumThriceAdoConstrained xs ys) zs
-                   , bench "Applicative rewriting, Codensity encoding" $
-                     whnf (sumThriceAdoCodensity xs ys) zs
-                   , bench "No rewriting             " $
-                     whnf (sumThriceNoAdo xs ys) zs]
-        , env (pure ([1 .. 6], 30)) $
+        [ env (pure ([1 .. 6], 8)) $
           \ ~(xs,n) ->
                bgroup
                    "probabilistic inference map"
-                   [ bench "Applicative Rewriting, Final encoding" $
-                     whnf (diceAdoFinal n) xs
-                   , bench "Applicative Rewriting, Initial encoding" $
-                     whnf (diceAdoInitial n) xs
-                   , bench "Applicative Rewriting, Constrained encoding" $
-                     whnf (diceAdoConstrained n) xs
-                   , bench "Applicative Rewriting, Codensity encoding" $
-                     whnf (diceAdoCodensity n) xs
-                   , bench "No rewriting             " $ whnf (diceNoAdo n) xs]
-        , env (pure ([1 .. 6], 30)) $
+                   [ bench "Applicative rewriting, Final encoding"       $ whnf (diceAdoFinal       n) xs
+                   , bench "Applicative rewriting, Initial encoding"     $ whnf (diceAdoInitial     n) xs
+                   , bench "Applicative rewriting, Constrained encoding" $ whnf (diceAdoConstrained n) xs
+                   , bench "Applicative rewriting, Codensity encoding"   $ whnf (diceAdoCodensity   n) xs
+                   , bench "No rewriting"                                $ whnf (diceNoAdo          n) xs]
+        , env (pure [1 .. 5]) $
+          \xs ->
+               bgroup
+                   "set"
+                   [ bench "Applicative rewriting, Final encoding"       $ whnf sumThriceAdoFinal       xs
+                   , bench "Applicative rewriting, Initial encoding"     $ whnf sumThriceAdoInitial     xs
+                   , bench "Applicative rewriting, Constrained encoding" $ whnf sumThriceAdoConstrained xs
+                   , bench "Applicative rewriting, Codensity encoding"   $ whnf sumThriceAdoCodensity   xs
+                   , bench "No rewriting"                                $ whnf sumThriceNoAdo          xs]
+        , env (pure ([1 .. 5], 30)) $
           \ ~(xs,n) ->
                bgroup
                    "probabilistic inference vect"
-                   [ bench "Applicative rewriting, Initial encoding" $
-                     whnf (diceVectAdoInitial n) xs
-                   ,
-                     -- , bench "Applicative Rewriting Codensity  " $ whnf (diceVectApplicative RewritingCodensity   n) xs
-                     bench
-                         "No rewriting" $
-                     whnf (diceVectNoAdo n) xs]]
+                   [ bench "Applicative rewriting, Initial encoding"  $ whnf (diceVectAdoInitial   n) xs
+                   , bench "Applicative rewriting Codensity encoding" $ whnf (diceVectAdoCodensity n) xs
+                   , bench "No rewriting"                             $ whnf (diceVectNoAdo        n) xs]]

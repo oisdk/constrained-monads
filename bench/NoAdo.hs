@@ -9,41 +9,37 @@ import           EnumVect
 import           Prob
 import           Numeric.Sized.WordOfSize
 
-sumThriceNoAdo :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceNoAdo xs ys zs = size $ do
-  x <- fromList xs
-  a <- fromList [0..x]
-  y <- fromList ys
-  z <- fromList zs
-  t <- fromList xs
-  u <- fromList ys
-  b <- fromList [0..y]
-  c <- fromList [0..z]
-  g <- fromList xs
-  h <- fromList ys
-  v <- fromList zs
-  pure (x + a + y + b + z + c + t + u + v + g + h)
+sumThriceNoAdo :: [Int] -> Int
+sumThriceNoAdo xs = size $ do
+  a <- fromList' xs
+  b <- fromList' xs
+  c <- upTo' (a + b)
+  d <- fromList' xs
+  e <- fromList' xs
+  pure (c + e + d)
+  where
+    upTo' n = fromList [1..n]
+    fromList' = fromList
 
-diceNoAdo :: Integer -> [Integer] -> Double
+diceNoAdo :: Int -> [Int] -> Double
 diceNoAdo n die' = probOf n $ do
-  t <- die
-  a <- upTo t
-  u <- die
-  w <- die
-  x <- die
-  v <- upTo u
-  y <- upTo w
-  z <- die
-  pure (a + t + u + x + y + z + v + w)
-  where die = uniform die'
+  a <- die
+  b <- die
+  c <- upTo' (a + b)
+  d <- die
+  e <- die
+  pure (c + e + d)
+  where
+    die = uniform die'
+    upTo' = upTo
 
 diceVectNoAdo :: WordOfSize 3 -> [WordOfSize 3] -> Double
 diceVectNoAdo n die' = probOfV n $ do
-  t <- die
-  a <- upToV t
-  u <- die
-  w <- die
-  v <- upToV u
-  y <- upToV w
-  pure (a + t + u + y + v + w)
-  where die = uniformV die'
+  a <- die
+  b <- upTo' a
+  c <- die
+  d <- upTo' c
+  pure (b + d)
+  where
+    die = uniformV die'
+    upTo' = upToV

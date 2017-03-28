@@ -11,137 +11,119 @@ import           Prob
 import           EnumVect
 import           Numeric.Sized.WordOfSize
 
-sumThriceAdoFinal :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoFinal xs ys zs = size . phi @ Final $ do
-  x <- eta (fromList xs)
-  a <- eta (fromList [0..x])
-  y <- eta (fromList ys)
-  z <- eta (fromList zs)
-  t <- eta (fromList xs)
-  u <- eta (fromList ys)
-  b <- eta (fromList [0..y])
-  c <- eta (fromList [0..z])
-  g <- eta (fromList xs)
-  h <- eta (fromList ys)
-  v <- eta (fromList zs)
-  pure (x + a + y + b + z + c + t + u + v + g + h)
+sumThriceAdoFinal :: [Int] -> Int
+sumThriceAdoFinal xs = size . phi @ Final $ do
+  a <- fromList' xs
+  b <- fromList' xs
+  c <- upTo' (a + b)
+  d <- fromList' xs
+  e <- fromList' xs
+  pure (c + e + d)
+  where
+    upTo' = eta . fromDistinctAscList . enumFromTo 1
+    fromList' = eta . fromList
 
-sumThriceAdoInitial :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoInitial xs ys zs = size . phi @ Initial $ do
-  x <- eta (fromList xs)
-  a <- eta (fromList [0..x])
-  y <- eta (fromList ys)
-  z <- eta (fromList zs)
-  t <- eta (fromList xs)
-  u <- eta (fromList ys)
-  b <- eta (fromList [0..y])
-  c <- eta (fromList [0..z])
-  g <- eta (fromList xs)
-  h <- eta (fromList ys)
-  v <- eta (fromList zs)
-  pure (x + a + y + b + z + c + t + u + v + g + h)
+sumThriceAdoInitial :: [Int] -> Int
+sumThriceAdoInitial xs = size . phi @ Initial $ do
+  a <- fromList' xs
+  b <- fromList' xs
+  c <- upTo' (a + b)
+  d <- fromList' xs
+  e <- fromList' xs
+  pure (c + e + d)
+  where
+    upTo' = eta . fromDistinctAscList . enumFromTo 1
+    fromList' = eta . fromList
 
-sumThriceAdoConstrained :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoConstrained xs ys zs = size . phi @ ConstrainedWrapper $ do
-  x <- eta (fromList xs)
-  a <- eta (fromList [0..x])
-  y <- eta (fromList ys)
-  z <- eta (fromList zs)
-  t <- eta (fromList xs)
-  u <- eta (fromList ys)
-  b <- eta (fromList [0..y])
-  c <- eta (fromList [0..z])
-  g <- eta (fromList xs)
-  h <- eta (fromList ys)
-  v <- eta (fromList zs)
-  pure (x + a + y + b + z + c + t + u + v + g + h)
+sumThriceAdoConstrained :: [Int] -> Int
+sumThriceAdoConstrained xs = size . phi @ ConstrainedWrapper $ do
+  a <- fromList' xs
+  b <- fromList' xs
+  c <- upTo' (a + b)
+  d <- fromList' xs
+  e <- fromList' xs
+  pure (c + e + d)
+  where
+    upTo' = eta . fromDistinctAscList . enumFromTo 1
+    fromList' = eta . fromList
 
-sumThriceAdoCodensity :: [Integer] -> [Integer] -> [Integer] -> Int
-sumThriceAdoCodensity xs ys zs = size . phi @ Codensity $ do
-  x <- eta (fromList xs)
-  a <- eta (fromList [0..x])
-  y <- eta (fromList ys)
-  z <- eta (fromList zs)
-  t <- eta (fromList xs)
-  u <- eta (fromList ys)
-  b <- eta (fromList [0..y])
-  c <- eta (fromList [0..z])
-  g <- eta (fromList xs)
-  h <- eta (fromList ys)
-  v <- eta (fromList zs)
-  pure (x + a + y + b + z + c + t + u + v + g + h)
+sumThriceAdoCodensity :: [Int] -> Int
+sumThriceAdoCodensity xs = size . phi @ Codensity $ do
+  a <- fromList' xs
+  b <- fromList' xs
+  c <- upTo' (a + b)
+  d <- fromList' xs
+  e <- fromList' xs
+  pure (c + e + d)
+  where
+    upTo' = eta . fromDistinctAscList . enumFromTo 1
+    fromList' = eta . fromList
 
-diceAdoFinal :: Integer -> [Integer] -> Double
+diceAdoFinal :: Int -> [Int] -> Double
 diceAdoFinal n die' = probOf n . phi @ Final $ do
-  t <- die
-  a <- eta (upTo t)
-  u <- die
-  w <- die
-  x <- die
-  v <- eta (upTo u)
-  y <- eta (upTo w)
-  z <- die
-  pure (a + t + u + x + y + z + v + w)
-  where die = eta (uniform die')
+  a <- die
+  b <- die
+  c <- upTo' (a + b)
+  d <- die
+  e <- die
+  pure (c + e + d)
+  where
+    die = eta (uniform die')
+    upTo' = eta . upTo
 
-diceAdoInitial :: Integer -> [Integer] -> Double
+diceAdoInitial :: Int -> [Int] -> Double
 diceAdoInitial n die' = probOf n . phi @ Initial $ do
-  t <- die
-  a <- eta (upTo t)
-  u <- die
-  w <- die
-  x <- die
-  v <- eta (upTo u)
-  y <- eta (upTo w)
-  z <- die
-  pure (a + t + u + x + y + z + v + w)
-  where die = eta (uniform die')
+  a <- die
+  b <- die
+  c <- upTo' (a + b)
+  d <- die
+  e <- die
+  pure (c + e + d)
+  where
+    die = eta (uniform die')
+    upTo' = eta . upTo
 
-diceAdoConstrained :: Integer -> [Integer] -> Double
+diceAdoConstrained :: Int -> [Int] -> Double
 diceAdoConstrained n die' = probOf n . phi @ ConstrainedWrapper $ do
-  t <- die
-  a <- eta (upTo t)
-  u <- die
-  w <- die
-  x <- die
-  v <- eta (upTo u)
-  y <- eta (upTo w)
-  z <- die
-  pure (a + t + u + x + y + z + v + w)
-  where die = eta (uniform die')
+  a <- die
+  b <- die
+  c <- upTo' (a + b)
+  d <- die
+  e <- die
+  pure (c + e + d)
+  where
+    die = eta (uniform die')
+    upTo' = eta . upTo
 
-diceAdoCodensity :: Integer -> [Integer] -> Double
+diceAdoCodensity :: Int -> [Int] -> Double
 diceAdoCodensity n die' = probOf n . phi @ Codensity $ do
-  t <- die
-  a <- eta (upTo t)
-  u <- die
-  w <- die
-  x <- die
-  v <- eta (upTo u)
-  y <- eta (upTo w)
-  z <- die
-  pure (a + t + u + x + y + z + v + w)
-  where die = eta (uniform die')
+  a <- die
+  b <- die
+  c <- upTo' (a + b)
+  d <- die
+  e <- die
+  pure (c + e + d)
+  where
+    die = eta (uniform die')
+    upTo' = eta . upTo
 
 diceVectAdoInitial :: WordOfSize 3 -> [WordOfSize 3] -> Double
 diceVectAdoInitial n die' = probOfV n . phi @ Initial $ do
-  t <- die
-  a <- eta (upToV t)
-  u <- die
-  w <- die
-  v <- eta (upToV u)
-  y <- eta (upToV w)
-  pure (a + t + u + y + v + w)
-  where die = eta (uniformV die')
+  a <- die
+  b <- upTo' a
+  c <- die
+  d <- upTo' c
+  pure (b + d)
+  where
+    die = eta (uniformV die')
+    upTo' = eta . upToV
 
 diceVectAdoCodensity :: WordOfSize 3 -> [WordOfSize 3] -> Double
 diceVectAdoCodensity n die' = probOfV n . phi @ Codensity $ do
-  t <- die
-  a <- eta (upToV t)
-  u <- die
-  w <- die
-  v <- eta (upToV u)
-  y <- eta (upToV w)
-  pure (a + t + u + y + v + w)
-  where die = eta (uniformV die')
-  
+  a <- die
+  b <- upTo' a
+  c <- die
+  pure (b + c)
+  where
+    die = eta (uniformV die')
+    upTo' = eta . upToV
