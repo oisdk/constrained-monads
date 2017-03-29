@@ -29,7 +29,7 @@ module Control.Monad.Constrained
   ,Unconstrained
   ,
    -- * Unconstrained applicative stuff
-   retractApM
+   ap
   ,
    -- * Useful functions
    guard
@@ -168,7 +168,7 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- provided in the Prelude. This is to facilitate the lifting of functions
 -- to arbitrary numbers of arguments.
 --
--- A minimal complete definition must include implementations of 'retractAp'
+-- A minimal complete definition must include implementations of 'reify'
 -- functions satisfying the following laws:
 --
 -- [/identity/]
@@ -207,23 +207,23 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
-    {-# MINIMAL liftAp , retractAp #-}
-    liftAp :: f a -> Unconstrained f a
-    retractAp
+    {-# MINIMAL reflect , reify #-}
+    reflect :: f a -> Unconstrained f a
+    reify
         :: Suitable f a
         => Unconstrained f a -> f a
     -- | Lift a value.
     pure
         :: Suitable f a
         => a -> f a
-    pure = retractAp . Prelude.pure
+    pure = reify . Prelude.pure
     {-# INLINE pure #-}
     infixl 4 <*>
     -- | Sequential application.
     (<*>)
         :: Suitable f b
         => f (a -> b) -> f a -> f b
-    (<*>) fs xs = retractAp (liftAp fs Prelude.<*> liftAp xs)
+    (<*>) fs xs = reify (reflect fs Prelude.<*> reflect xs)
     {-# INLINE (<*>) #-}
     infixl 4 *>
     -- | Sequence actions, discarding the value of the first argument.
@@ -240,7 +240,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     (<*) = liftA2 const
     {-# INLINE (<*) #-}
     -- | The shenanigans introduced by this function are to account for the fact
-    -- that you can't (I don't think) write an arbitrary liftAp function on
+    -- that you can't (I don't think) write an arbitrary reflect function on
     -- non-monadic applicatives that have constrained types. For instance, if
     -- the only present functions are:
     --
@@ -263,7 +263,7 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     --    y <- ys
     --    'pure' (f x y)@
     --
-    -- But now we can't define the 'retractAp' functions for things which are
+    -- But now we can't define the 'reify' functions for things which are
     -- 'Applicative' but not 'Monad' (square matrices,
     -- 'Control.Applicative.ZipList's, etc). Also, some types have a more
     -- efficient @('<*>')@ than @('>>=')@ (see, for instance, the
@@ -271,28 +271,28 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
     -- monad).
     --
     -- The one missing piece is @-XApplicativeDo@: I can't figure out a way
-    -- to get do-notation to desugar to using the 'retractAp' functions, rather
+    -- to get do-notation to desugar to using the 'reify' functions, rather
     -- than @('<*>')@.
     --
     -- From some preliminary performance testing, it seems that this approach
     -- has /no/ performance overhead.
     --
     -- Utility definitions of this function are provided: if your 'Applicative'
-    -- is a @Prelude.'Prelude.Applicative'@, 'retractAp' can be defined in terms of
-    -- @('<*>')@. 'retractAp' does exactly this.
+    -- is a @Prelude.'Prelude.Applicative'@, 'reify' can be defined in terms of
+    -- @('<*>')@. 'reify' does exactly this.
     --
-    -- Alternatively, if your applicative is a 'Monad', 'retractAp' can be defined
-    -- in terms of @('>>=')@, which is what 'retractApM' does.
+    -- Alternatively, if your applicative is a 'Monad', 'reify' can be defined
+    -- in terms of @('>>=')@, which is what 'reifyM' does.
     liftA2
         :: (Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
-    liftA2 f xs ys = retractAp (Control.Applicative.liftA2 f (liftAp xs) (liftAp ys))
+    liftA2 f xs ys = reify (Control.Applicative.liftA2 f (reflect xs) (reflect ys))
     {-# INLINE liftA2 #-}
     liftA3
         :: (Suitable f d)
         => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
     liftA3 f xs ys zs =
-        retractAp (Control.Applicative.liftA3 f (liftAp xs) (liftAp ys) (liftAp zs))
+        reify (Control.Applicative.liftA3 f (reflect xs) (reflect ys) (reflect zs))
     {-# INLINE liftA3 #-}
 
 infixl 4 <**>
@@ -301,13 +301,17 @@ infixl 4 <**>
 (<**>) = liftA2 (flip ($))
 {-# INLINE (<**>) #-}
 
--- | A definition of 'retractAp' that uses monadic operations.
-retractApM :: (Monad f, Suitable f a) => Initial.Ap f a -> f a
-retractApM = go pure where
-  go :: (Suitable f b, Monad f) => (a -> f b) -> Initial.Ap f a -> f b
-  go f (Pure x) = f x
-  go f (Ap x xs) = x >>= \y -> go (\c -> (f . c) y) xs
-{-# INLINE retractApM #-}
+-- | A definition of 'reify' that uses monadic operations. This is actually
+-- the instance of applicative for codensity in disguise.
+ap
+    :: (Monad f, Suitable f a)
+    => (a -> f a) -> Initial.Ap f a -> f a
+ap = flip runAp
+  where
+    runAp :: (Suitable f b, Monad f) => Ap f a -> (a -> f b) -> f b
+    runAp (Pure x) = \c -> c x
+    runAp (Ap xs fs) = \c -> runAp fs (\g -> (>>=) xs (c . g))
+{-# INLINE ap #-}
 
 {- | The 'Monad' class defines the basic operations over a /monad/,
 a concept from a branch of mathematics known as /category theory/.
@@ -720,16 +724,16 @@ instance Functor [] where
 type instance Unconstrained [] = []
 
 instance Applicative [] where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -763,16 +767,16 @@ instance Functor Maybe where
 type instance Unconstrained Maybe = Maybe
 
 instance Applicative Maybe where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -807,16 +811,16 @@ instance Functor IO where
 type instance Unconstrained IO = IO
 
 instance Applicative IO where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -847,16 +851,16 @@ instance Functor Identity where
 type instance Unconstrained Identity = Identity
 
 instance Applicative Identity where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -881,16 +885,16 @@ instance Functor (Either e) where
 type instance Unconstrained (Either a) = Either a
 
 instance Applicative (Either a) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -926,10 +930,10 @@ instance Applicative Set where
     {-# INLINE (*>) #-}
     xs <* ys = if null ys then Set.empty else xs
     {-# INLINE (<*) #-}
-    retractAp (ChurchSet xs) = xs (flip Set.insert) Set.empty
-    {-# INLINE retractAp #-}
-    liftAp xs = ChurchSet (\f b -> Set.foldl' f b xs)
-    {-# INLINE liftAp #-}
+    reify (ChurchSet xs) = xs (flip Set.insert) Set.empty
+    {-# INLINE reify #-}
+    reflect xs = ChurchSet (\f b -> Set.foldl' f b xs)
+    {-# INLINE reflect #-}
 
 instance Monad Set where
     (>>=) = flip foldMap
@@ -961,16 +965,16 @@ instance Functor ((,) a) where
 type instance Unconstrained ((,) a) = ((,) a)
 
 instance Monoid a => Applicative ((,) a) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1002,16 +1006,16 @@ instance Functor Seq where
 type instance Unconstrained Seq = Seq
 
 instance Applicative Seq where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1042,16 +1046,16 @@ instance Functor Tree where
 type instance Unconstrained Tree = Tree
 
 instance Applicative Tree where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1065,8 +1069,8 @@ instance Monad Tree where
 
 instance Traversable Tree where
     traverse f (Node x ts) =
-        let g = (liftAp . f)
-        in retractAp
+        let g = (reflect . f)
+        in reify
                (Node Prelude.<$> g x Prelude.<*>
                 Prelude.traverse (Prelude.traverse g) ts)
 
@@ -1080,16 +1084,16 @@ instance Functor ((->) a) where
 type instance Unconstrained ((->) a) = ((->) a)
 
 instance Applicative ((->) a) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1111,16 +1115,16 @@ instance Functor (ContT r m) where
 type instance Unconstrained (ContT r m) = ContT r m
 
 instance Applicative (ContT r m) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1143,16 +1147,16 @@ type instance Unconstrained Control.Applicative.ZipList =
      Control.Applicative.ZipList
 
 instance Applicative Control.Applicative.ZipList where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
     (<*>) = (Prelude.<*>)
     (*>) = (Prelude.*>)
     (<*) = (Prelude.<*)
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
-    {-# INLINE retractAp #-}
-    {-# INLINE liftAp #-}
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -1177,8 +1181,8 @@ type instance Unconstrained (Strict.StateT s m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (Strict.StateT s m) where
-    liftAp (Strict.StateT xs) = Strict.StateT (liftAp . xs)
-    {-# INLINE liftAp #-}
+    reflect (Strict.StateT xs) = Strict.StateT (reflect . xs)
+    {-# INLINE reflect #-}
     pure a =
         Strict.StateT $
         \ !s ->
@@ -1204,8 +1208,8 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
             (_,!s'') <- ys s'
             pure (x, s'')
     {-# INLINE (<*) #-}
-    retractAp (Strict.StateT xs) = Strict.StateT (retractAp . xs)
-    {-# INLINE retractAp #-}
+    reify (Strict.StateT xs) = Strict.StateT (reify . xs)
+    {-# INLINE reify #-}
 
 instance (Monad m, Alternative m, Prelude.Monad (Unconstrained m)) =>
          Alternative (Strict.StateT s m) where
@@ -1237,8 +1241,8 @@ type instance Unconstrained (StateT s m) = StateT s (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (StateT s m) where
-    liftAp (StateT xs) = StateT (liftAp . xs)
-    {-# INLINE liftAp #-}
+    reflect (StateT xs) = StateT (reflect . xs)
+    {-# INLINE reflect #-}
     pure a =
         StateT $
         \s ->
@@ -1261,7 +1265,7 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
             ~(x,s') <- xs s
             ~(_,s'') <- ys s'
             pure (x,s'')
-    retractAp (StateT xs) = StateT (retractAp . xs)
+    reify (StateT xs) = StateT (reify . xs)
 
 instance (Monad m, Alternative m, Prelude.Monad (Unconstrained m)) =>
          Alternative (StateT s m) where
@@ -1289,13 +1293,13 @@ type instance Unconstrained (ReaderT r m) = ReaderT r (Unconstrained m)
 
 instance (Applicative m) => Applicative (ReaderT r m) where
     pure = liftReaderT . pure
-    liftAp (ReaderT f) = ReaderT (liftAp . f)
-    {-# INLINE liftAp #-}
+    reflect (ReaderT f) = ReaderT (reflect . f)
+    {-# INLINE reflect #-}
     {-# INLINE pure #-}
     f <*> v = ReaderT $ \ r -> runReaderT f r <*> runReaderT v r
     {-# INLINE (<*>) #-}
-    retractAp ys = ReaderT (retractAp . runReaderT ys)
-    {-# INLINE retractAp #-}
+    reify ys = ReaderT (reify . runReaderT ys)
+    {-# INLINE reify #-}
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
 
@@ -1329,10 +1333,10 @@ type instance Unconstrained (MaybeT m) = MaybeT (Unconstrained m)
 
 instance (Prelude.Monad (Unconstrained m), Monad m) =>
          Applicative (MaybeT m) where
-    liftAp (MaybeT x) = MaybeT (liftAp x)
+    reflect (MaybeT x) = MaybeT (reflect x)
     pure x = MaybeT (pure (Just x))
     MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
-    retractAp (MaybeT x) = MaybeT (retractAp x)
+    reify (MaybeT x) = MaybeT (reify x)
     MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
     MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
 
@@ -1360,11 +1364,11 @@ type instance Unconstrained (ExceptT e m) = ExceptT e (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (ExceptT e m) where
-    liftAp (ExceptT x) = ExceptT (liftAp x)
+    reflect (ExceptT x) = ExceptT (reflect x)
 
     pure x = ExceptT (pure (Right x))
     ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
-    retractAp (ExceptT xs) = ExceptT (retractAp xs)
+    reify (ExceptT xs) = ExceptT (reify xs)
     ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
     ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
 
@@ -1395,14 +1399,14 @@ instance Functor m =>
 type instance Unconstrained (IdentityT m) = IdentityT (Unconstrained m)
 instance Applicative m =>
          Applicative (IdentityT m) where
-    liftAp (IdentityT x) = IdentityT (liftAp x)
+    reflect (IdentityT x) = IdentityT (reflect x)
     pure = (coerce :: (a -> f a) -> a -> IdentityT f a) pure
     (<*>) =
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
-    retractAp =
+    reify =
         (coerce :: (Unconstrained f b -> f b) -> (IdentityT (Unconstrained f) b -> IdentityT f b))
-            retractAp
+            reify
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
 
@@ -1424,8 +1428,8 @@ instance Functor (ST s) where
 type instance Unconstrained (ST s) = ST s
 
 instance Applicative (ST s) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
 
 instance Monad (ST s) where
     (>>=) = (Prelude.>>=)
@@ -1438,8 +1442,8 @@ instance Functor (Const a) where
 type instance Unconstrained (Const a) = Const a
 
 instance Monoid a => Applicative (Const a) where
-    retractAp = id
-    liftAp = id
+    reify = id
+    reflect = id
 
 instance (Functor f, Functor g) =>
          Functor (Compose f g) where
@@ -1451,8 +1455,8 @@ type instance Unconstrained (Compose f g) =
 
 instance (Applicative f, Applicative g) =>
          Applicative (Compose f g) where
-  retractAp (Compose xs) = Compose (retractAp (Prelude.fmap retractAp xs))
-  liftAp (Compose xs) = Compose (Prelude.fmap liftAp (liftAp xs))
+  reify (Compose xs) = Compose (reify (Prelude.fmap reify xs))
+  reflect (Compose xs) = Compose (Prelude.fmap reflect (reflect xs))
 
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
@@ -1469,8 +1473,8 @@ instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
-    retractAp (Pair xs ys) = Pair (retractAp xs) (retractAp ys)
-    liftAp (Pair xs ys) = Pair (liftAp xs) (liftAp ys)
+    reify (Pair xs ys) = Pair (reify xs) (reify ys)
+    reflect (Pair xs ys) = Pair (reflect xs) (reflect ys)
 
 instance (Alternative f, Alternative g) => Alternative (Product f g) where
     empty = Pair empty empty

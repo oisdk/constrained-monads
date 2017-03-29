@@ -145,9 +145,9 @@ newtype ConstrainedWrapper f a
   { unwrapConstrained :: Constrained.Unconstrained f a }
 
 instance Constrained.Applicative f => FreeApplicative ConstrainedWrapper f where
-  liftAp = ConstrainedWrapper . Constrained.liftAp
+  liftAp = ConstrainedWrapper . Constrained.reflect
   {-# INLINE liftAp #-}
-  retractAp (ConstrainedWrapper xs) = Constrained.retractAp xs
+  retractAp (ConstrainedWrapper xs) = Constrained.reify xs
   {-# INLINE retractAp #-}
 
 instance Constrained.Applicative f =>
@@ -168,7 +168,7 @@ instance Constrained.Monad f =>
     type Suitable (ConstrainedWrapper f) a
         = (Constrained.Suitable f a, Constrained.Suitable f (f a))
     ConstrainedWrapper xs >>= f =
-        liftAp (Constrained.retractAp xs Constrained.>>= (retractAp . f))
+        liftAp (Constrained.reify xs Constrained.>>= (retractAp . f))
     {-# INLINE (>>=) #-}
     join =
         liftAp .
@@ -178,13 +178,13 @@ instance Constrained.Monad f =>
 instance Constrained.Applicative f => FreeApplicative Final f where
   liftAp = Final.liftAp
   {-# INLINE liftAp #-}
-  retractAp = Constrained.retractAp . Final.runAp Constrained.liftAp
+  retractAp = Constrained.reify . Final.runAp Constrained.reflect
   {-# INLINE retractAp #-}
 
 instance Constrained.Applicative f => FreeApplicative Initial f where
   liftAp = Initial.liftAp
   {-# INLINE liftAp #-}
-  retractAp = Constrained.retractAp . Initial.runAp Constrained.liftAp
+  retractAp = Constrained.reify . Initial.runAp Constrained.reflect
   {-# INLINE retractAp #-}
 
 instance Constrained.Monad f => FreeApplicative Codensity f where

@@ -80,8 +80,8 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    retractAp (ChurchSet xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
-    liftAp (IntSet xs) = ChurchSet (\f b -> IntSet.foldl' f b xs)
+    reify (ChurchSet xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
+    reflect (IntSet xs) = ChurchSet (\f b -> IntSet.foldl' f b xs)
 
 type instance Unconstrained IntSet = ChurchSet
 

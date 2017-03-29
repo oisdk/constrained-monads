@@ -30,17 +30,17 @@ instance Functor EnumVect where
 type instance Unconstrained EnumVect = Dist
 
 instance Applicative EnumVect where
-    liftAp (EnumVect xs) =
+    reflect (EnumVect xs) =
         Dist (Prelude.zip (range (minBound, maxBound)) (toList xs))
-    retractAp (Dist (xs :: [(a, Double)])) =
+    reify (Dist (xs :: [(a, Double)])) =
         EnumVect $
         accum
             (+)
             (replicate (rangeSize (minBound :: a, maxBound)) 0)
             [ (index (minBound, maxBound) x, p)
             | (x,p) <- xs ]
-    {-# INLINE liftAp #-}
-    {-# INLINE retractAp #-}
+    {-# INLINE reflect #-}
+    {-# INLINE reify #-}
 
 instance Monad EnumVect where
     EnumVect xs >>= (f :: a -> EnumVect b) =

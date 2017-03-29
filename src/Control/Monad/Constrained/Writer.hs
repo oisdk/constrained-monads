@@ -172,8 +172,8 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
-    retractAp = retractApM
-    liftAp = Free.liftAp
+    reify = ap (WriterT_ . pure)
+    reflect = Free.liftAp
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Monad (WriterT s m) where
