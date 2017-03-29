@@ -32,8 +32,11 @@ instance Functor Gen where
   fmap = Prelude.fmap
   (<$) = (Prelude.<$)
 
+type instance Unconstrained Gen = Gen
+
 instance Applicative Gen where
-  lower = lowerP
+  eta = id
+  phi = id
 
 instance Monad Gen where
   (>>=) = (Prelude.>>=)
