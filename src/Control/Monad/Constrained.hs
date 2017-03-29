@@ -731,6 +731,7 @@ instance Applicative [] where
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
     {-# INLINE phi #-}
+    {-# INLINE eta #-}
     {-# INLINE (<*>) #-}
     {-# INLINE (*>) #-}
     {-# INLINE (<*) #-}
@@ -741,6 +742,8 @@ instance Applicative [] where
 instance Alternative [] where
     empty = []
     (<|>) = (++)
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance Monad [] where
     (>>=) = (Prelude.>>=)
@@ -756,6 +759,8 @@ instance Functor Maybe where
     type Suitable Maybe a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained Maybe = Maybe
 
@@ -768,13 +773,24 @@ instance Applicative Maybe where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Alternative Maybe where
     empty = Control.Applicative.empty
     (<|>) = (Control.Applicative.<|>)
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance Monad Maybe where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance MonadFail Maybe where
     fail _ = Nothing
@@ -787,6 +803,8 @@ instance Functor IO where
     type Suitable IO a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained IO = IO
 
@@ -799,13 +817,24 @@ instance Applicative IO where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Alternative IO where
     empty = Control.Applicative.empty
     (<|>) = (Control.Applicative.<|>)
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance Monad IO where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance MonadFail IO where
     fail = Prelude.fail
@@ -814,6 +843,8 @@ instance Functor Identity where
     type Suitable Identity a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained Identity = Identity
 
@@ -826,9 +857,18 @@ instance Applicative Identity where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad Identity where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Traversable Identity where
     traverse f (Identity x) = fmap Identity (f x)
@@ -837,6 +877,8 @@ instance Functor (Either e) where
     type Suitable (Either e) a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (Either a) = Either a
 
@@ -849,9 +891,18 @@ instance Applicative (Either a) where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad (Either a) where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance IsString a =>
          MonadFail (Either a) where
@@ -871,7 +922,7 @@ newtype List a
   = List (forall b. (b -> a -> b) -> b -> b)
 
 instance Prelude.Functor List where
-    fmap f (List xs) = List (\c -> xs (\ !a e -> c a (f e)))
+    fmap f (List xs) = List (\c -> xs (\ !a -> c a . f))
     {-# INLINE fmap #-}
 
 instance Prelude.Applicative List where
@@ -879,7 +930,7 @@ instance Prelude.Applicative List where
         List (\c b -> c b x)
     {-# INLINE pure #-}
     List fs <*> List xs =
-      List (\c -> fs (\ !fb f -> xs (\ !xb x -> c xb (f x)) fb))
+      List (\c -> fs (\ !fb f -> xs (\ !xb -> c xb . f) fb))
     {-# INLINE (<*>) #-}
 
 type instance Unconstrained Set = List
@@ -906,16 +957,22 @@ instance MonadFail Set where
 instance Alternative Set where
     empty = Set.empty
     (<|>) = Set.union
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance Functor (Map a) where
     type Suitable (Map a) b = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 instance Functor ((,) a) where
     type Suitable ((,) a) b = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained ((,) a) = ((,) a)
 
@@ -928,9 +985,18 @@ instance Monoid a => Applicative ((,) a) where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monoid a => Monad ((,) a) where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Traversable ((,) a) where
     traverse f (x,y) = fmap ((,) x) (f y)
@@ -939,11 +1005,15 @@ instance Functor IntMap where
     type Suitable IntMap a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 instance Functor Seq where
     type Suitable Seq a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained Seq = Seq
 
@@ -956,13 +1026,24 @@ instance Applicative Seq where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Alternative Seq where
     empty = Control.Applicative.empty
     (<|>) = (Control.Applicative.<|>)
+    {-# INLINE empty #-}
+    {-# INLINE (<|>) #-}
 
 instance Monad Seq where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance MonadFail Seq where
     fail _ = empty
@@ -971,6 +1052,8 @@ instance Functor Tree where
     type Suitable Tree a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained Tree = Tree
 
@@ -983,9 +1066,18 @@ instance Applicative Tree where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad Tree where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Traversable Tree where
     traverse f (Node x ts) =
@@ -998,6 +1090,8 @@ instance Functor ((->) a) where
     type Suitable ((->) a) b = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained ((->) a) = ((->) a)
 
@@ -1010,14 +1104,25 @@ instance Applicative ((->) a) where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad ((->) a) where
-  (>>=) = (Prelude.>>=)
+    (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Functor (ContT r m) where
     type Suitable (ContT r m) a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (ContT r m) = ContT r m
 
@@ -1030,14 +1135,25 @@ instance Applicative (ContT r m) where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad (ContT r m) where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Functor Control.Applicative.ZipList where
     type Suitable Control.Applicative.ZipList a = ()
     fmap = Prelude.fmap
     (<$) = (Prelude.<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained Control.Applicative.ZipList =
      Control.Applicative.ZipList
@@ -1051,6 +1167,14 @@ instance Applicative Control.Applicative.ZipList where
     pure = Prelude.pure
     liftA2 = Control.Applicative.liftA2
     liftA3 = Control.Applicative.liftA3
+    {-# INLINE phi #-}
+    {-# INLINE eta #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Functor m =>
          Functor (Strict.StateT s m) where
