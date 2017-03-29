@@ -25,6 +25,7 @@ library
                      , Control.Monad.Constrained.Cont
                      , Control.Monad.Constrained.IntSet
                      , Control.Monad.Constrained.Ap
+  other-modules:       Control.Monad.Constrained.Internal.Unconstrained
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5
                      , transformers >= 0.5

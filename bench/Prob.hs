@@ -50,10 +50,10 @@ instance Functor Prob where
 type instance Unconstrained Prob = Dist
 
 instance Applicative Prob where
-    eta = Dist . Map.toList . runProb
-    {-# INLINE eta #-}
-    phi = Prob . Map.fromListWith (+) . runDist
-    {-# INLINE phi #-}
+    liftAp = Dist . Map.toList . runProb
+    {-# INLINE liftAp #-}
+    retractAp = Prob . Map.fromListWith (+) . runDist
+    {-# INLINE retractAp #-}
     _ *> x = x
     {-# INLINE (*>) #-}
     x <* _ = x

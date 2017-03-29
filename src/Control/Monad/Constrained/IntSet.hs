@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE RebindableSyntax  #-}
-{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 -- | This module creates an 'IntSet' type with a phantom type variable, allowing
 -- it to conform to 'Functor', 'Foldable', etc. Other than that, it's a
@@ -23,16 +23,19 @@ module Control.Monad.Constrained.IntSet
   ,minView)
   where
 
-import           Control.Monad.Constrained hiding (filter)
+import           Control.Monad.Constrained                        hiding
+                                                                   (filter)
 
-import qualified Data.IntSet               as IntSet
+import qualified Data.IntSet                                      as IntSet
 
-import           Data.Foldable             (Foldable (..))
+import           Data.Foldable                                    (Foldable (..))
 import           Data.Functor.Classes
 import           Data.Semigroup
 
-import           Control.Arrow             (first)
+import           Control.Arrow                                    (first)
 import           GHC.Exts
+
+import           Control.Monad.Constrained.Internal.Unconstrained
 
 -- | This type is a wrapper around 'Data.IntSet.IntSet', with a phantom type
 -- variable which must always be 'Int'. This allows it to conform to 'Functor',
@@ -77,10 +80,10 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    phi = phiM
-    eta = liftAp
+    retractAp (ChurchSet xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
+    liftAp (IntSet xs) = ChurchSet (\f b -> IntSet.foldl' f b xs)
 
-type instance Unconstrained IntSet = Ap IntSet
+type instance Unconstrained IntSet = ChurchSet
 
 instance Alternative IntSet where
     empty = mempty

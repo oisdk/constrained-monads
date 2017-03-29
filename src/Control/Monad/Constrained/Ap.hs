@@ -1,10 +1,10 @@
-{-# LANGUAGE ConstraintKinds  #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE RebindableSyntax #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 -- | This module allows the use of the Applicative Do extension with
 -- constrained monads.
@@ -27,21 +27,22 @@ import qualified Control.Monad.Constrained        as Constrained
 import           GHC.Exts
 
 import qualified Control.Monad
-import           Prelude                          as RestPrelude hiding (Monad (..))
+import           Prelude                          as RestPrelude hiding
+                                                                  (Monad (..))
 import qualified Prelude
 
 import           Control.Monad.Trans.Cont         (ContT)
-import           Control.Monad.Trans.Except       (ExceptT(..))
+import           Control.Monad.Trans.Except       (ExceptT (..))
 import           Control.Monad.Trans.Identity     (IdentityT (..))
-import           Control.Monad.Trans.Maybe        (MaybeT(..))
+import           Control.Monad.Trans.Maybe        (MaybeT (..))
 import           Control.Monad.Trans.Reader       (ReaderT (..))
 import           Control.Monad.Trans.State        (StateT)
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT)
 import           Data.Functor.Identity            (Identity)
 import           Data.Sequence                    (Seq)
 
-import qualified Control.Applicative.Free.Final as Final
-import qualified Control.Applicative.Free as Initial
+import qualified Control.Applicative.Free         as Initial
+import qualified Control.Applicative.Free.Final   as Final
 
 -- | This class is for types which have no constraints on their applicative
 -- operations, but /do/ have constraints on the monadic operations.
@@ -90,9 +91,9 @@ class Monad f => MonadFail f where
 instance (Constrained.Monad f) =>
          Monad (Initial f) where
     type Suitable (Initial f) a = Constrained.Suitable f a
-    (>>=) ap f = Initial.liftAp (phi ap Constrained.>>= (phi . f))
+    (>>=) ap f = Initial.liftAp (retractAp ap Constrained.>>= (retractAp . f))
     {-# INLINE (>>=) #-}
-    join = Initial.liftAp . go phi
+    join = Initial.liftAp . go retractAp
       where
         go
             :: forall a f b.
@@ -108,9 +109,9 @@ type Final = Final.Ap
 instance (Constrained.Monad f) =>
          Monad (Final f) where
     type Suitable (Final f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
-    (>>=) ap f = Final.liftAp (phi ap Constrained.>>= (phi . f))
+    (>>=) ap f = Final.liftAp (retractAp ap Constrained.>>= (retractAp . f))
     {-# INLINE (>>=) #-}
-    join = Final.liftAp . Constrained.join . phi . fmap phi
+    join = Final.liftAp . Constrained.join . retractAp . fmap retractAp
     {-# INLINE join #-}
 
 newtype Codensity f a = Codensity
@@ -130,24 +131,24 @@ instance Applicative (Codensity f) where
 
 instance (Constrained.Monad f) => Monad (Codensity f) where
   type Suitable (Codensity f) a = Constrained.Suitable f a
-  m >>= k = eta (phi m Constrained.>>= (phi . k))
+  m >>= k = liftAp (retractAp m Constrained.>>= (retractAp . k))
   {-# INLINE (>>=) #-}
-  join (Codensity xs) = Codensity (Constrained.=<< xs phi)
+  join (Codensity xs) = Codensity (Constrained.=<< xs retractAp)
   {-# INLINE join #-}
 
 class FreeApplicative ap f where
-  eta :: f a -> ap f a
-  phi :: (Constrained.Suitable f a) => ap f a -> f a
+  liftAp :: f a -> ap f a
+  retractAp :: (Constrained.Suitable f a) => ap f a -> f a
 
 newtype ConstrainedWrapper f a
   = ConstrainedWrapper
   { unwrapConstrained :: Constrained.Unconstrained f a }
 
 instance Constrained.Applicative f => FreeApplicative ConstrainedWrapper f where
-  eta = ConstrainedWrapper . Constrained.eta
-  {-# INLINE eta #-}
-  phi (ConstrainedWrapper xs) = Constrained.phi xs
-  {-# INLINE phi #-}
+  liftAp = ConstrainedWrapper . Constrained.liftAp
+  {-# INLINE liftAp #-}
+  retractAp (ConstrainedWrapper xs) = Constrained.retractAp xs
+  {-# INLINE retractAp #-}
 
 instance Constrained.Applicative f =>
          Functor (ConstrainedWrapper f) where
@@ -167,30 +168,30 @@ instance Constrained.Monad f =>
     type Suitable (ConstrainedWrapper f) a
         = (Constrained.Suitable f a, Constrained.Suitable f (f a))
     ConstrainedWrapper xs >>= f =
-        eta (Constrained.phi xs Constrained.>>= (phi . f))
+        liftAp (Constrained.retractAp xs Constrained.>>= (retractAp . f))
     {-# INLINE (>>=) #-}
     join =
-        eta .
-        Constrained.join . phi . fmap phi
+        liftAp .
+        Constrained.join . retractAp . fmap retractAp
     {-# INLINE join #-}
 
 instance Constrained.Applicative f => FreeApplicative Final f where
-  eta = Final.liftAp
-  {-# INLINE eta #-}
-  phi = Constrained.phi . Final.runAp Constrained.eta
-  {-# INLINE phi #-}
+  liftAp = Final.liftAp
+  {-# INLINE liftAp #-}
+  retractAp = Constrained.retractAp . Final.runAp Constrained.liftAp
+  {-# INLINE retractAp #-}
 
 instance Constrained.Applicative f => FreeApplicative Initial f where
-  eta = Initial.liftAp
-  {-# INLINE eta #-}
-  phi = Constrained.phi . Initial.runAp Constrained.eta
-  {-# INLINE phi #-}
+  liftAp = Initial.liftAp
+  {-# INLINE liftAp #-}
+  retractAp = Constrained.retractAp . Initial.runAp Constrained.liftAp
+  {-# INLINE retractAp #-}
 
 instance Constrained.Monad f => FreeApplicative Codensity f where
-  eta xs = Codensity (xs Constrained.>>=)
-  {-# INLINE eta #-}
-  phi (Codensity fs) = fs Constrained.pure
-  {-# INLINE phi #-}
+  liftAp xs = Codensity (xs Constrained.>>=)
+  {-# INLINE liftAp #-}
+  retractAp (Codensity fs) = fs Constrained.pure
+  {-# INLINE retractAp #-}
 
 -- | An alias for 'pure'
 return :: Applicative f => a -> f a
@@ -199,7 +200,7 @@ return = pure
 
 -- | Function to which the @if ... then ... else@ syntax desugars to
 ifThenElse :: Bool -> a -> a -> a
-ifThenElse True t _ = t
+ifThenElse True t _  = t
 ifThenElse False _ f = f
 
 infixl 1 >>

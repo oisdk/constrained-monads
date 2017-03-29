@@ -12,7 +12,7 @@ import           EnumVect
 import           Numeric.Sized.WordOfSize
 
 sumThriceAdoFinal :: [Int] -> Int
-sumThriceAdoFinal xs = size . phi @ Final $ do
+sumThriceAdoFinal xs = size . retractAp @ Final $ do
   a <- fromList' xs
   b <- fromList' xs
   c <- upTo' (a + b)
@@ -20,11 +20,11 @@ sumThriceAdoFinal xs = size . phi @ Final $ do
   e <- fromList' xs
   pure (c + e + d)
   where
-    upTo' = eta . fromDistinctAscList . enumFromTo 1
-    fromList' = eta . fromList
+    upTo' = liftAp . fromDistinctAscList . enumFromTo 1
+    fromList' = liftAp . fromList
 
 sumThriceAdoInitial :: [Int] -> Int
-sumThriceAdoInitial xs = size . phi @ Initial $ do
+sumThriceAdoInitial xs = size . retractAp @ Initial $ do
   a <- fromList' xs
   b <- fromList' xs
   c <- upTo' (a + b)
@@ -32,11 +32,11 @@ sumThriceAdoInitial xs = size . phi @ Initial $ do
   e <- fromList' xs
   pure (c + e + d)
   where
-    upTo' = eta . fromDistinctAscList . enumFromTo 1
-    fromList' = eta . fromList
+    upTo' = liftAp . fromDistinctAscList . enumFromTo 1
+    fromList' = liftAp . fromList
 
 sumThriceAdoConstrained :: [Int] -> Int
-sumThriceAdoConstrained xs = size . phi @ ConstrainedWrapper $ do
+sumThriceAdoConstrained xs = size . retractAp @ ConstrainedWrapper $ do
   a <- fromList' xs
   b <- fromList' xs
   c <- upTo' (a + b)
@@ -44,11 +44,11 @@ sumThriceAdoConstrained xs = size . phi @ ConstrainedWrapper $ do
   e <- fromList' xs
   pure (c + e + d)
   where
-    upTo' = eta . fromDistinctAscList . enumFromTo 1
-    fromList' = eta . fromList
+    upTo' = liftAp . fromDistinctAscList . enumFromTo 1
+    fromList' = liftAp . fromList
 
 sumThriceAdoCodensity :: [Int] -> Int
-sumThriceAdoCodensity xs = size . phi @ Codensity $ do
+sumThriceAdoCodensity xs = size . retractAp @ Codensity $ do
   a <- fromList' xs
   b <- fromList' xs
   c <- upTo' (a + b)
@@ -56,11 +56,11 @@ sumThriceAdoCodensity xs = size . phi @ Codensity $ do
   e <- fromList' xs
   pure (c + e + d)
   where
-    upTo' = eta . fromDistinctAscList . enumFromTo 1
-    fromList' = eta . fromList
+    upTo' = liftAp . fromDistinctAscList . enumFromTo 1
+    fromList' = liftAp . fromList
 
 diceAdoFinal :: Int -> [Int] -> Double
-diceAdoFinal n die' = probOf n . phi @ Final $ do
+diceAdoFinal n die' = probOf n . retractAp @ Final $ do
   a <- die
   b <- die
   c <- upTo' (a + b)
@@ -68,11 +68,11 @@ diceAdoFinal n die' = probOf n . phi @ Final $ do
   e <- die
   pure (c + e + d)
   where
-    die = eta (uniform die')
-    upTo' = eta . upTo
+    die = liftAp (uniform die')
+    upTo' = liftAp . upTo
 
 diceAdoInitial :: Int -> [Int] -> Double
-diceAdoInitial n die' = probOf n . phi @ Initial $ do
+diceAdoInitial n die' = probOf n . retractAp @ Initial $ do
   a <- die
   b <- die
   c <- upTo' (a + b)
@@ -80,11 +80,11 @@ diceAdoInitial n die' = probOf n . phi @ Initial $ do
   e <- die
   pure (c + e + d)
   where
-    die = eta (uniform die')
-    upTo' = eta . upTo
+    die = liftAp (uniform die')
+    upTo' = liftAp . upTo
 
 diceAdoConstrained :: Int -> [Int] -> Double
-diceAdoConstrained n die' = probOf n . phi @ ConstrainedWrapper $ do
+diceAdoConstrained n die' = probOf n . retractAp @ ConstrainedWrapper $ do
   a <- die
   b <- die
   c <- upTo' (a + b)
@@ -92,11 +92,11 @@ diceAdoConstrained n die' = probOf n . phi @ ConstrainedWrapper $ do
   e <- die
   pure (c + e + d)
   where
-    die = eta (uniform die')
-    upTo' = eta . upTo
+    die = liftAp (uniform die')
+    upTo' = liftAp . upTo
 
 diceAdoCodensity :: Int -> [Int] -> Double
-diceAdoCodensity n die' = probOf n . phi @ Codensity $ do
+diceAdoCodensity n die' = probOf n . retractAp @ Codensity $ do
   a <- die
   b <- die
   c <- upTo' (a + b)
@@ -104,26 +104,26 @@ diceAdoCodensity n die' = probOf n . phi @ Codensity $ do
   e <- die
   pure (c + e + d)
   where
-    die = eta (uniform die')
-    upTo' = eta . upTo
+    die = liftAp (uniform die')
+    upTo' = liftAp . upTo
 
 diceVectAdoInitial :: WordOfSize 3 -> [WordOfSize 3] -> Double
-diceVectAdoInitial n die' = probOfV n . phi @ Initial $ do
+diceVectAdoInitial n die' = probOfV n . retractAp @ Initial $ do
   a <- die
   b <- upTo' a
   c <- die
   d <- upTo' c
   pure (b + d)
   where
-    die = eta (uniformV die')
-    upTo' = eta . upToV
+    die = liftAp (uniformV die')
+    upTo' = liftAp . upToV
 
 diceVectAdoCodensity :: WordOfSize 3 -> [WordOfSize 3] -> Double
-diceVectAdoCodensity n die' = probOfV n . phi @ Codensity $ do
+diceVectAdoCodensity n die' = probOfV n . retractAp @ Codensity $ do
   a <- die
   b <- upTo' a
   c <- die
   pure (b + c)
   where
-    die = eta (uniformV die')
-    upTo' = eta . upToV
+    die = liftAp (uniformV die')
+    upTo' = liftAp . upToV

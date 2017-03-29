@@ -47,6 +47,9 @@ import           Data.Functor.Classes
 
 import qualified Prelude
 
+import           Control.Applicative.Free hiding (liftAp)
+import qualified Control.Applicative.Free as Free
+
 -- | A class for monads with logging ability.
 class (Monoid w, Monad m) => MonadWriter w m | m -> w where
     type WriterSuitable m a :: Constraint
@@ -169,8 +172,8 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)
     WriterT_ xs <* WriterT_ ys = WriterT_ (xs <* ys)
-    phi = phiM
-    eta = liftAp
+    retractAp = retractApM
+    liftAp = Free.liftAp
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Monad (WriterT s m) where
