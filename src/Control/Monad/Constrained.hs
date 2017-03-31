@@ -173,8 +173,8 @@ class Functor f  where
 --
 -- A minimal complete definition must include implementations of 'reflect' and
 -- reify which convert to and from a law-abiding applicative, such that they
--- form an isomorphism. Alterantively, you
--- functions satisfying the following laws:
+-- form an isomorphism. Alternatively, you can conform to the standard prelude
+-- classes, and satisfy the following laws:
 --
 -- [/identity/]
 --
@@ -248,50 +248,6 @@ class (Prelude.Applicative (Unconstrained f), Functor f) =>
         => f a -> f b -> f a
     (<*) = liftA2 const
     {-# INLINE (<*) #-}
-    -- | The shenanigans introduced by this function are to account for the fact
-    -- that you can't (I don't think) write an arbitrary reflect function on
-    -- non-monadic applicatives that have constrained types. For instance, if
-    -- the only present functions are:
-    --
-    -- @'pure'  :: 'Suitable' f a => a -> f b
-    --'fmap'  :: 'Suitable' f b => (a -> b) -> f a -> f b
-    --('<*>') :: 'Suitable' f b => f (a -> b) -> f a -> f b@
-    --
-    -- I can't see a way to define:
-    --
-    -- @'liftA2' :: 'Suitable' f c => (a -> b -> c) -> f a -> f b -> f c@
-    --
-    -- Of course, if:
-    --
-    -- @('>>=') :: 'Suitable' f b => f a -> (a -> f b) -> f b@
-    --
-    -- is available, 'liftA2' could be defined as:
-    --
-    -- @'liftA2' f xs ys = do
-    --    x <- xs
-    --    y <- ys
-    --    'pure' (f x y)@
-    --
-    -- But now we can't define the 'reify' functions for things which are
-    -- 'Applicative' but not 'Monad' (square matrices,
-    -- 'Control.Applicative.ZipList's, etc). Also, some types have a more
-    -- efficient @('<*>')@ than @('>>=')@ (see, for instance, the
-    -- <https://simonmar.github.io/posts/2015-10-20-Fun-With-Haxl-1.html Haxl>
-    -- monad).
-    --
-    -- The one missing piece is @-XApplicativeDo@: I can't figure out a way
-    -- to get do-notation to desugar to using the 'reify' functions, rather
-    -- than @('<*>')@.
-    --
-    -- From some preliminary performance testing, it seems that this approach
-    -- has /no/ performance overhead.
-    --
-    -- Utility definitions of this function are provided: if your 'Applicative'
-    -- is a @Prelude.'Prelude.Applicative'@, 'reify' can be defined in terms of
-    -- @('<*>')@. 'reify' does exactly this.
-    --
-    -- Alternatively, if your applicative is a 'Monad', 'reify' can be defined
-    -- in terms of @('>>=')@, which is what 'reifyM' does.
     liftA2
         :: (Suitable f c)
         => (a -> b -> c) -> f a -> f b -> f c
