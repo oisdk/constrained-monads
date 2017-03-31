@@ -45,57 +45,81 @@ data IntSet a where
 
 instance Foldable IntSet where
     foldr f b (IntSet xs) = IntSet.foldr f b xs
+    {-# INLINE foldr #-}
     foldl f b (IntSet xs) = IntSet.foldl f b xs
+    {-# INLINE foldl #-}
     foldr' f b (IntSet xs) = IntSet.foldr' f b xs
+    {-# INLINE foldr' #-}
     foldl' f b (IntSet xs) = IntSet.foldl' f b xs
+    {-# INLINE foldl' #-}
     null (IntSet xs) = IntSet.null xs
+    {-# INLINE null #-}
     length (IntSet xs) = IntSet.size xs
+    {-# INLINE length #-}
     minimum (IntSet xs) = IntSet.findMin xs
+    {-# INLINE minimum #-}
     maximum (IntSet xs) = IntSet.findMax xs
+    {-# INLINE maximum #-}
     elem x (IntSet xs) = IntSet.member x xs
+    {-# INLINE elem #-}
 
 instance Functor IntSet where
     type Suitable IntSet a = a ~ Int
     fmap f (IntSet xs) = IntSet (IntSet.map f xs)
+    {-# INLINE fmap #-}
     x <$ IntSet xs =
         IntSet
             (if IntSet.null xs
                  then IntSet.empty
                  else IntSet.singleton x)
+    {-# INLINE (<$) #-}
 
 instance Semigroup (IntSet a) where
     IntSet xs <> IntSet ys = IntSet (IntSet.union xs ys)
+    {-# INLINE (<>) #-}
 
 instance a ~ Int => Monoid (IntSet a) where
     mempty = IntSet IntSet.empty
+    {-# INLINE mempty #-}
     mappend = (<>)
+    {-# INLINE mappend #-}
 
 instance Applicative IntSet where
     pure x = IntSet (IntSet.singleton x)
+    {-# INLINE pure #-}
     xs *> ys =
         if null xs
             then mempty
             else ys
+    {-# INLINE (*>) #-}
     xs <* ys =
         if null ys
             then mempty
             else xs
+    {-# INLINE (<*) #-}
     reify (StrictLeftFold xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
+    {-# INLINE reify #-}
     reflect (IntSet xs) = StrictLeftFold (\f b -> IntSet.foldl' f b xs)
+    {-# INLINE reflect #-}
 
 type instance Unconstrained IntSet = StrictLeftFold
 
 instance Alternative IntSet where
     empty = mempty
+    {-# INLINE empty #-}
     (<|>) = mappend
+    {-# INLINE (<|>) #-}
 
 instance Monad IntSet where
     (>>=) = flip foldMap
+    {-# INLINE (>>=) #-}
 
 instance a ~ Int => IsList (IntSet a) where
   type Item (IntSet a) = a
   fromList = IntSet . IntSet.fromList
+  {-# INLINE fromList #-}
   toList = foldr (:) []
+  {-# INLINE toList #-}
 
 infixl 9 \\
 -- | /O(n+m)/. See 'difference'.
@@ -108,6 +132,7 @@ IntSet xs \\ IntSet ys = IntSet (xs IntSet.\\ ys)
 -- > lookupLT 5 (fromList [3, 5]) == Just 3
 lookupLT :: a -> IntSet a -> Maybe a
 lookupLT x (IntSet xs) = IntSet.lookupLT x xs
+{-# INLINE lookupLT #-}
 
 -- | /O(log n)/. Find smallest element greater than the given one.
 --
@@ -115,6 +140,7 @@ lookupLT x (IntSet xs) = IntSet.lookupLT x xs
 -- > lookupGT 5 (fromList [3, 5]) == Nothing
 lookupGT :: a -> IntSet a -> Maybe a
 lookupGT x (IntSet xs) = IntSet.lookupGT x xs
+{-# INLINE lookupGT #-}
 
 -- | /O(log n)/. Find largest element smaller or equal to the given one.
 --
@@ -123,6 +149,7 @@ lookupGT x (IntSet xs) = IntSet.lookupGT x xs
 -- > lookupLE 5 (fromList [3, 5]) == Just 5
 lookupLE :: a -> IntSet a -> Maybe a
 lookupLE x (IntSet xs) = IntSet.lookupLE x xs
+{-# INLINE lookupLE #-}
 
 -- | /O(log n)/. Find smallest element greater or equal to the given one.
 --
@@ -131,34 +158,41 @@ lookupLE x (IntSet xs) = IntSet.lookupLE x xs
 -- > lookupGE 6 (fromList [3, 5]) == Nothing
 lookupGE :: a -> IntSet a -> Maybe a
 lookupGE x (IntSet xs) = IntSet.lookupGE x xs
+{-# INLINE lookupGE #-}
 
 -- | /O(min(n,W))/. Add a value to the set. There is no left- or right bias for
 -- IntSets.
 insert :: a -> IntSet a -> IntSet a
 insert x (IntSet xs) = IntSet (IntSet.insert x xs)
+{-# INLINE insert #-}
 
 -- | /O(min(n,W))/. Delete a value in the set. Returns the
 -- original set when the value was not present.
 delete :: a -> IntSet a -> IntSet a
 delete x (IntSet xs) = IntSet (IntSet.delete x xs)
+{-# INLINE delete #-}
 
 -- | /O(n+m)/. Difference between two sets.
 difference :: IntSet a -> IntSet a -> IntSet a
 difference (IntSet xs) (IntSet ys) = IntSet (IntSet.difference xs ys)
+{-# INLINE difference #-}
 
 -- | /O(n+m)/. The intersection of two sets.
 intersection :: IntSet a -> IntSet a -> IntSet a
 intersection (IntSet xs) (IntSet ys) = IntSet (IntSet.intersection xs ys)
+{-# INLINE intersection #-}
 
 -- | /O(n)/. Filter all elements that satisfy some predicate.
 filter :: (a -> Bool) -> IntSet a -> IntSet a
 filter p (IntSet xs) = IntSet (IntSet.filter p xs)
+{-# INLINE filter #-}
 
 -- | /O(n)/. partition the set according to some predicate.
 partition :: (a -> Bool) -> IntSet a -> (IntSet a, IntSet a)
 partition p (IntSet xs) =
     let (ys,zs) = IntSet.partition p xs
     in (IntSet ys, IntSet zs)
+{-# INLINE partition #-}
 
 -- | /O(min(n,W))/. The expression (@'split' x set@) is a pair @(set1,set2)@
 -- where @set1@ comprises the elements of @set@ less than @x@ and @set2@
@@ -169,38 +203,48 @@ split :: a -> IntSet a -> (IntSet a, IntSet a)
 split x (IntSet xs) =
     let (ys,zs) = IntSet.split x xs
     in (IntSet ys, IntSet zs)
+{-# INLINE split #-}
 
 -- | /O(min(n,W))/. Retrieves the maximal key of the set, and the set
 -- stripped of that element, or 'Nothing' if passed an empty set.
 maxView :: IntSet a -> Maybe (a, IntSet a)
 maxView (IntSet xs) = (fmap.fmap) IntSet (IntSet.maxView xs)
+{-# INLINE maxView #-}
 
 -- | /O(min(n,W))/. Retrieves the minimal key of the set, and the set
 -- stripped of that element, or 'Nothing' if passed an empty set.
 minView :: IntSet a -> Maybe (a, IntSet a)
 minView (IntSet xs) = (fmap.fmap) IntSet (IntSet.minView xs)
+{-# INLINE minView #-}
 
 instance Show1 IntSet where
     liftShowsPrec _ _ d (IntSet xs) = showsPrec d xs
+    {-# INLINE liftShowsPrec #-}
 
 instance Show a =>
          Show (IntSet a) where
     showsPrec = showsPrec1
+    {-# INLINE showsPrec #-}
 
 instance a ~ Int =>
          Read (IntSet a) where
     readsPrec n = (fmap . first) IntSet . readsPrec n
+    {-# INLINE readsPrec #-}
 
 instance Eq1 IntSet where
     liftEq _ (IntSet xs) (IntSet ys) = xs == ys
+    {-# INLINE liftEq #-}
 
 instance Eq a =>
          Eq (IntSet a) where
     (==) = eq1
+    {-# INLINE (==) #-}
 
 instance Ord1 IntSet where
     liftCompare _ (IntSet xs) (IntSet ys) = compare xs ys
+    {-# INLINE liftCompare #-}
 
 instance Ord a =>
          Ord (IntSet a) where
     compare = compare1
+    {-# INLINE compare #-}
