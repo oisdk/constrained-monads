@@ -533,6 +533,7 @@ infixr 1 =<<, <=<
 -- | A flipped version of '>>='
 (=<<) :: (Monad f, Suitable f b) => (a -> f b) -> f a -> f b
 (=<<) = flip (>>=)
+{-# INLINE (=<<) #-}
 
 -- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped.
 --
@@ -542,11 +543,13 @@ infixr 1 =<<, <=<
 -- > (<=<) :: Monad m => (b -> m c) -> (a -> m b) -> a -> m c
 (<=<) :: (Monad f, Suitable f c) => (b -> f c) -> (a -> f b) -> a -> f c
 (f <=< g) x = f =<< g x
+{-# INLINE (<=<) #-}
 
 infixl 1 >=>
 
 -- | Left-to-right Kleisli composition of monads.
 (>=>) :: (Monad f, Suitable f c) => (a -> f b) -> (b -> f c) -> a -> f c
+{-# INLINE (>=>) #-}
 (f >=> g) x = f x >>= g
 
 -- | @'forever' act@ repeats the action infinitely.
@@ -584,24 +587,28 @@ traverse_
     => (a -> f b) -> t a -> f ()
 traverse_ f =
     foldr (\e a -> f e *> a) (pure ())
+{-# INLINE traverse_ #-}
 
 -- | Evaluate each action in the structure from left to right, and
 -- ignore the results. For a version that doesn't ignore the results
 -- see 'Data.Traversable.sequenceA'.
 sequenceA_ :: (Foldable t, Applicative f, Suitable f ()) => t (f a) -> f ()
 sequenceA_ = foldr (*>) (pure ())
+{-# INLINE sequenceA_ #-}
 
 -- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
 -- and 'empty' if @b@ is 'False'.
 guard :: (Alternative f, Suitable f ()) => Bool -> f ()
 guard True = pure ()
 guard False = empty
+{-# INLINE guard #-}
 
 -- | @'ensure' b x@ is @x@ if @b@ is 'True',
 -- and 'empty' if @b@ is 'False'.
 ensure :: (Alternative f, Suitable f a) => Bool -> f a -> f a
 ensure True x = x
 ensure False _ = empty
+{-# INLINE ensure #-}
 
 -- | Evaluate each action in the structure from left to right, and
 -- and collect the results. For a version that ignores the results
@@ -614,6 +621,7 @@ sequenceA
        ,Suitable f a)
     => t (f a) -> f (t a)
 sequenceA = traverse id
+{-# INLINE sequenceA #-}
 
 -- |The 'mapAccumL' function behaves like a combination of 'fmap'
 -- and 'foldl'; it applies a function to each element of a structure,
@@ -625,6 +633,7 @@ mapAccumL
 mapAccumL f s t = swap $ runState (traverse (state . (swap .: flip f)) t) s
   where
     (.:) = (.) . (.)
+{-# INLINE mapAccumL #-}
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
@@ -680,10 +689,12 @@ replicateM cnt0 f =
 -- 2
 void :: (Functor f, Suitable f ()) => f a -> f ()
 void = (<$) ()
+{-# INLINE void #-}
 
 -- | Collapse one monadic layer.
 join :: (Monad f, Suitable f a) => f (f a) -> f a
 join x = x >>= id
+{-# INLINE join #-}
 
 --------------------------------------------------------------------------------
 -- syntax
@@ -693,6 +704,7 @@ join x = x >>= id
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse True  t _ = t
 ifThenElse False _ f = f
+{-# INLINE ifThenElse #-}
 
 infixl 1 >>
 -- | Sequence two actions, discarding the result of the first. Alias for
@@ -753,9 +765,11 @@ instance Monad [] where
 
 instance MonadFail [] where
     fail _ = []
+    {-# INLINE fail #-}
 
 instance Traversable [] where
     traverse f = foldr (liftA2 (:) . f) (pure [])
+    {-# INLINE traverse #-}
 
 instance Functor Maybe where
     type Suitable Maybe a = ()
@@ -768,20 +782,20 @@ type instance Unconstrained Maybe = Maybe
 
 instance Applicative Maybe where
     reify = id
-    reflect = id
-    (<*>) = (Prelude.<*>)
-    (*>) = (Prelude.*>)
-    (<*) = (Prelude.<*)
-    pure = Prelude.pure
-    liftA2 = Control.Applicative.liftA2
-    liftA3 = Control.Applicative.liftA3
     {-# INLINE reify #-}
+    reflect = id
     {-# INLINE reflect #-}
+    (<*>) = (Prelude.<*>)
     {-# INLINE (<*>) #-}
+    (*>) = (Prelude.*>)
     {-# INLINE (*>) #-}
+    (<*) = (Prelude.<*)
     {-# INLINE (<*) #-}
+    pure = Prelude.pure
     {-# INLINE pure #-}
+    liftA2 = Control.Applicative.liftA2
     {-# INLINE liftA2 #-}
+    liftA3 = Control.Applicative.liftA3
     {-# INLINE liftA3 #-}
 
 instance Alternative Maybe where
@@ -796,10 +810,12 @@ instance Monad Maybe where
 
 instance MonadFail Maybe where
     fail _ = Nothing
+    {-# INLINE fail #-}
 
 instance Traversable Maybe where
     traverse _ Nothing = pure Nothing
     traverse f (Just x) = fmap Just (f x)
+    {-# INLINE traverse #-}
 
 instance Functor IO where
     type Suitable IO a = ()
@@ -840,6 +856,7 @@ instance Monad IO where
 
 instance MonadFail IO where
     fail = Prelude.fail
+    {-# INLINE fail #-}
 
 instance Functor Identity where
     type Suitable Identity a = ()
@@ -909,9 +926,11 @@ instance Monad (Either a) where
 instance IsString a =>
          MonadFail (Either a) where
     fail = Left . fromString
+    {-# INLINE fail #-}
 
 instance Traversable (Either a) where
     traverse f = either (pure . Left) (fmap Right . f)
+    {-# INLINE traverse #-}
 
 instance Functor Set where
     type Suitable Set a = Ord a
@@ -919,7 +938,6 @@ instance Functor Set where
     {-# INLINE fmap #-}
     x <$ xs = if null xs then Set.empty else Set.singleton x
     {-# INLINE (<$) #-}
-
 
 type instance Unconstrained Set = StrictLeftFold
 
@@ -941,6 +959,7 @@ instance Monad Set where
 
 instance MonadFail Set where
     fail _ = Set.empty
+    {-# INLINE fail #-}
 
 instance Alternative Set where
     empty = Set.empty
@@ -988,6 +1007,7 @@ instance Monoid a => Monad ((,) a) where
 
 instance Traversable ((,) a) where
     traverse f (x,y) = fmap ((,) x) (f y)
+    {-# INLINE traverse #-}
 
 instance Functor IntMap where
     type Suitable IntMap a = ()
@@ -1035,6 +1055,7 @@ instance Monad Seq where
 
 instance MonadFail Seq where
     fail _ = empty
+    {-# INLINE fail #-}
 
 instance Functor Tree where
     type Suitable Tree a = ()
@@ -1073,6 +1094,7 @@ instance Traversable Tree where
         in reify
                (Node Prelude.<$> g x Prelude.<*>
                 Prelude.traverse (Prelude.traverse g) ts)
+    {-# INLINE traverse #-}
 
 instance Functor ((->) a) where
     type Suitable ((->) a) b = ()
@@ -1175,6 +1197,7 @@ instance Functor m =>
              Strict.runStateT m s
     {-# INLINE fmap #-}
     x <$ xs = Strict.StateT ((fmap . first) (const x) . Strict.runStateT xs)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (Strict.StateT s m)
     = Strict.StateT s (Unconstrained m)
@@ -1288,6 +1311,7 @@ instance (Functor m) => Functor (ReaderT r m) where
     fmap f = mapReaderT (fmap f)
     {-# INLINE fmap #-}
     x <$ ReaderT xs = ReaderT (\r -> x <$ xs r)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (ReaderT r m) = ReaderT r (Unconstrained m)
 
@@ -1302,6 +1326,8 @@ instance (Applicative m) => Applicative (ReaderT r m) where
     {-# INLINE reify #-}
     ReaderT xs *> ReaderT ys = ReaderT (\c -> xs c *> ys c)
     ReaderT xs <* ReaderT ys = ReaderT (\c -> xs c <* ys c)
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
 
 instance (Alternative m) => Alternative (ReaderT r m) where
     empty   = liftReaderT empty
@@ -1312,6 +1338,7 @@ instance (Alternative m) => Alternative (ReaderT r m) where
 instance MonadFail m =>
          MonadFail (ReaderT r m) where
     fail = ReaderT . const . fail
+    {-# INLINE fail #-}
 
 instance (Monad m) => Monad (ReaderT r m) where
     m >>= k  = ReaderT $ \ r -> do
@@ -1327,18 +1354,26 @@ instance Functor m =>
          Functor (MaybeT m) where
     type Suitable (MaybeT m) a = (Suitable m (Maybe a), Suitable m a)
     fmap f (MaybeT xs) = MaybeT ((fmap . fmap) f xs)
+    {-# INLINE fmap #-}
     x <$ MaybeT xs = MaybeT (fmap (x <$) xs)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (MaybeT m) = MaybeT (Unconstrained m)
 
 instance (Prelude.Monad (Unconstrained m), Monad m) =>
          Applicative (MaybeT m) where
     reflect (MaybeT x) = MaybeT (reflect x)
+    {-# INLINE reflect #-}
     pure x = MaybeT (pure (Just x))
+    {-# INLINE pure #-}
     MaybeT fs <*> MaybeT xs = MaybeT (liftA2 (<*>) fs xs)
     reify (MaybeT x) = MaybeT (reify x)
+    {-# INLINE reify #-}
     MaybeT xs *> MaybeT ys = MaybeT (liftA2 (*>) xs ys)
     MaybeT xs <* MaybeT ys = MaybeT (liftA2 (<*) xs ys)
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Monad (MaybeT m) where
@@ -1348,43 +1383,57 @@ instance (Monad m, Prelude.Monad (Unconstrained m)) =>
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          MonadFail (MaybeT m) where
     fail _ = empty
+    {-# INLINE fail #-}
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Alternative (MaybeT m) where
     empty = MaybeT (pure Nothing)
+    {-# INLINE empty #-}
     MaybeT x <|> MaybeT y = MaybeT (x >>= maybe y (pure . Just))
+    {-# INLINE (<|>) #-}
 
 instance Functor m =>
          Functor (ExceptT e m) where
     type Suitable (ExceptT e m) a = Suitable m (Either e a)
     fmap f (ExceptT xs) = ExceptT ((fmap . fmap) f xs)
+    {-# INLINE fmap #-}
     x <$ ExceptT xs = ExceptT (fmap (x <$) xs)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (ExceptT e m) = ExceptT e (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (ExceptT e m) where
     reflect (ExceptT x) = ExceptT (reflect x)
-
+    {-# INLINE reflect #-}
     pure x = ExceptT (pure (Right x))
+    {-# INLINE pure #-}
     ExceptT fs <*> ExceptT xs = ExceptT (liftA2 (<*>) fs xs)
     reify (ExceptT xs) = ExceptT (reify xs)
+    {-# INLINE reify #-}
     ExceptT xs *> ExceptT ys = ExceptT (xs *> ys)
     ExceptT xs <* ExceptT ys = ExceptT (xs <* ys)
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
 
 instance (Monad m, IsString e, Prelude.Monad (Unconstrained m)) =>
          MonadFail (ExceptT e m) where
     fail = ExceptT . pure . Left . fromString
+    {-# INLINE fail #-}
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Monad (ExceptT e m) where
     ExceptT xs >>= f = ExceptT (xs >>= either (pure . Left) (runExceptT . f))
+    {-# INLINE (>>=) #-}
 
 instance (Monad m, Monoid e, Prelude.Monad (Unconstrained m)) =>
          Alternative (ExceptT e m) where
     empty = ExceptT (pure (Left mempty))
+    {-# INLINE empty #-}
     ExceptT xs <|> ExceptT ys =
         ExceptT (xs >>= either (const ys) (pure . Right))
+    {-# INLINE (<|>) #-}
 
 instance Functor m =>
          Functor (IdentityT m) where
@@ -1395,60 +1444,104 @@ instance Functor m =>
     (<$) =
         (coerce :: (a -> f b -> f a) -> a -> IdentityT f b -> IdentityT f a)
             (<$)
+    {-# INLINE fmap #-}
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (IdentityT m) = IdentityT (Unconstrained m)
 instance Applicative m =>
          Applicative (IdentityT m) where
     reflect (IdentityT x) = IdentityT (reflect x)
+    {-# INLINE reflect #-}
     pure = (coerce :: (a -> f a) -> a -> IdentityT f a) pure
+    {-# INLINE pure #-}
     (<*>) =
         (coerce :: (f (a -> b) -> f a -> f b) -> IdentityT f (a -> b) -> IdentityT f a -> IdentityT f b)
             (<*>)
     reify =
         (coerce :: (Unconstrained f b -> f b) -> (IdentityT (Unconstrained f) b -> IdentityT f b))
             reify
+    {-# INLINE reify #-}
     IdentityT xs *> IdentityT ys = IdentityT (xs *> ys)
     IdentityT xs <* IdentityT ys = IdentityT (xs <* ys)
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
 
 instance Monad m =>
          Monad (IdentityT m) where
     (>>=) =
         (coerce :: (f a -> (a -> f b) -> f b) -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
+    {-# INLINE (>>=) #-}
 
 instance MonadFail m =>
          MonadFail (IdentityT m) where
     fail = IdentityT . fail
+    {-# INLINE fail #-}
 
 instance Functor (ST s) where
     type Suitable (ST s) a = ()
     fmap = Prelude.fmap
+    {-# INLINE fmap #-}
     (<$) = (Prelude.<$)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (ST s) = ST s
 
 instance Applicative (ST s) where
     reify = id
     reflect = id
+    (<*>) = (Prelude.<*>)
+    (*>) = (Prelude.*>)
+    (<*) = (Prelude.<*)
+    pure = Prelude.pure
+    liftA2 = Control.Applicative.liftA2
+    liftA3 = Control.Applicative.liftA3
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance Monad (ST s) where
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
 
 instance Functor (Const a) where
     type Suitable (Const a) b = ()
     fmap = Prelude.fmap
+    {-# INLINE fmap #-}
     (<$) = (Prelude.<$)
+    {-# INLINE (<$) #-}
 
 type instance Unconstrained (Const a) = Const a
 
 instance Monoid a => Applicative (Const a) where
     reify = id
     reflect = id
+    (<*>) = (Prelude.<*>)
+    (*>) = (Prelude.*>)
+    (<*) = (Prelude.<*)
+    pure = Prelude.pure
+    liftA2 = Control.Applicative.liftA2
+    liftA3 = Control.Applicative.liftA3
+    {-# INLINE reify #-}
+    {-# INLINE reflect #-}
+    {-# INLINE (<*>) #-}
+    {-# INLINE (*>) #-}
+    {-# INLINE (<*) #-}
+    {-# INLINE pure #-}
+    {-# INLINE liftA2 #-}
+    {-# INLINE liftA3 #-}
 
 instance (Functor f, Functor g) =>
          Functor (Compose f g) where
     type Suitable (Compose f g) a = (Suitable g a, Suitable f (g a))
     fmap f (Compose xs) = Compose ((fmap . fmap) f xs)
+    {-# INLINE fmap #-}
 
 type instance Unconstrained (Compose f g) =
      Compose (Unconstrained f) (Unconstrained g)
@@ -1456,15 +1549,20 @@ type instance Unconstrained (Compose f g) =
 instance (Applicative f, Applicative g) =>
          Applicative (Compose f g) where
   reify (Compose xs) = Compose (reify (Prelude.fmap reify xs))
+  {-# INLINE reify #-}
   reflect (Compose xs) = Compose (Prelude.fmap reflect (reflect xs))
+  {-# INLINE reflect #-}
 
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
+    {-# INLINE empty #-}
     Compose x <|> Compose y = Compose (x <|> y)
+    {-# INLINE (<|>) #-}
 
 instance (Functor f, Functor g) => Functor (Product f g) where
     type Suitable (Product f g) a = (Suitable f a, Suitable g a)
     fmap f (Pair x y) = Pair (fmap f x) (fmap f y)
+    {-# INLINE fmap #-}
 
 type instance Unconstrained (Product f g) =
      Product (Unconstrained f) (Unconstrained g)
@@ -1472,21 +1570,29 @@ type instance Unconstrained (Product f g) =
 instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
+    {-# INLINE pure #-}
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
+    {-# INLINE (<*>) #-}
     reify (Pair xs ys) = Pair (reify xs) (reify ys)
+    {-# INLINE reify #-}
     reflect (Pair xs ys) = Pair (reflect xs) (reflect ys)
+    {-# INLINE reflect #-}
 
 instance (Alternative f, Alternative g) => Alternative (Product f g) where
     empty = Pair empty empty
+    {-# INLINE empty #-}
     Pair x1 y1 <|> Pair x2 y2 = Pair (x1 <|> x2) (y1 <|> y2)
+    {-# INLINE (<|>) #-}
 
 instance (Monad f, Monad g) => Monad (Product f g) where
     Pair m n >>= f = Pair (m >>= fstP . f) (n >>= sndP . f)
       where
         fstP (Pair a _) = a
         sndP (Pair _ b) = b
+    {-# INLINE (>>=) #-}
 
 instance (Functor f, Functor g) => Functor (Sum f g) where
     type Suitable (Sum f g) a = (Suitable f a, Suitable g a)
     fmap f (InL x) = InL (fmap f x)
     fmap f (InR y) = InR (fmap f y)
+    {-# INLINE fmap #-}
