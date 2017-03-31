@@ -26,7 +26,6 @@ module Control.Monad.Constrained
   ,Alternative(..)
   ,Traversable(..)
   ,MonadFail(..)
-  ,Unconstrained
   ,
    -- * Unconstrained applicative stuff
    ap
@@ -118,23 +117,28 @@ import Control.Monad.Constrained.Internal.Unconstrained
 -- 'Prelude.Functor'. The way to make a standard 'Prelude.Functor' conform
 -- is by indicating that it has no constraints. For instance, for @[]@:
 --
--- @instance 'Functor' [] where
---  type 'Suitable' [] a = ()
---  fmap = map
---  (<$) = (Prelude.<$)@
+-- @
+-- instance 'Functor' [] where
+--   fmap = map
+--   (<$) = (Prelude.<$)
+-- @
 --
 -- Monomorphic types can also conform, using GADT aliases. For instance,
 -- if you create an alias for 'Data.IntSet.IntSet' of kind @* -> *@:
 --
--- @data IntSet a where
---  IntSet :: IntSet.'Data.IntSet.IntSet' -> IntSet 'Int'@
+-- @
+-- data IntSet a where
+--   IntSet :: IntSet.'Data.IntSet.IntSet' -> IntSet 'Int'
+-- @
 --
 -- It can be made to conform to 'Functor' like so:
 --
--- @instance 'Functor' IntSet where
---  type 'Suitable' IntSet a = a ~ 'Int'
---  'fmap' f (IntSet xs) = IntSet (IntSet.'Data.IntSet.map' f xs)
---  x '<$' xs = if 'null' xs then 'empty' else 'pure' x@
+-- @
+-- instance 'Functor' IntSet where
+--   type 'Suitable' IntSet a = a ~ 'Int'
+--   'fmap' f (IntSet xs) = IntSet (IntSet.'Data.IntSet.map' f xs)
+--   x '<$' xs = if 'null' xs then 'empty' else 'pure' x
+-- @
 --
 -- It can also be made conform to 'Foldable', etc. This type is provided in
 -- "Control.Monad.Constrained.IntSet".
@@ -148,6 +152,7 @@ class Functor f  where
     --    'fmap' = Set.'Set.map'
     --    x '<$' xs = if Set.'Set.null' xs then Set.'Set.empty' else Set.'Set.singleton' x@
     type Suitable f a :: Constraint
+    type Suitable f a = ()
 
     -- | Maps a function over a functor
     fmap
@@ -160,15 +165,15 @@ class Functor f  where
     (<$) = fmap . const
     {-# INLINE (<$) #-}
 
-type family Unconstrained (f :: * -> *) :: * -> *
-
 -- | A functor with application.
 --
 -- This class is slightly different (although equivalent) to the class
 -- provided in the Prelude. This is to facilitate the lifting of functions
 -- to arbitrary numbers of arguments.
 --
--- A minimal complete definition must include implementations of 'reify'
+-- A minimal complete definition must include implementations of 'reflect' and
+-- reify which convert to and from a law-abiding applicative, such that they
+-- form an isomorphism. Alterantively, you
 -- functions satisfying the following laws:
 --
 -- [/identity/]
@@ -207,6 +212,10 @@ type family Unconstrained (f :: * -> *) :: * -> *
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 class (Prelude.Applicative (Unconstrained f), Functor f) =>
       Applicative f  where
+
+    type Unconstrained f :: * -> *
+    type Unconstrained f = f
+
     {-# MINIMAL reflect , reify #-}
     reflect :: f a -> Unconstrained f a
     reify
@@ -733,9 +742,9 @@ instance Functor [] where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained [] = []
 
 instance Applicative [] where
+    type Unconstrained [] = []
     reify = id
     reflect = id
     (<*>) = (Prelude.<*>)
@@ -777,8 +786,6 @@ instance Functor Maybe where
     (<$) = (Prelude.<$)
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
-
-type instance Unconstrained Maybe = Maybe
 
 instance Applicative Maybe where
     reify = id
@@ -824,8 +831,6 @@ instance Functor IO where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained IO = IO
-
 instance Applicative IO where
     reify = id
     reflect = id
@@ -865,8 +870,6 @@ instance Functor Identity where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained Identity = Identity
-
 instance Applicative Identity where
     reify = id
     reflect = id
@@ -898,8 +901,6 @@ instance Functor (Either e) where
     (<$) = (Prelude.<$)
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
-
-type instance Unconstrained (Either a) = Either a
 
 instance Applicative (Either a) where
     reify = id
@@ -939,9 +940,9 @@ instance Functor Set where
     x <$ xs = if null xs then Set.empty else Set.singleton x
     {-# INLINE (<$) #-}
 
-type instance Unconstrained Set = StrictLeftFold
 
 instance Applicative Set where
+    type Unconstrained Set = StrictLeftFold
     pure = Set.singleton
     {-# INLINE pure #-}
     xs *> ys = if null xs then Set.empty else ys
@@ -980,8 +981,6 @@ instance Functor ((,) a) where
     (<$) = (Prelude.<$)
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
-
-type instance Unconstrained ((,) a) = ((,) a)
 
 instance Monoid a => Applicative ((,) a) where
     reify = id
@@ -1023,8 +1022,6 @@ instance Functor Seq where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained Seq = Seq
-
 instance Applicative Seq where
     reify = id
     reflect = id
@@ -1064,8 +1061,6 @@ instance Functor Tree where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained Tree = Tree
-
 instance Applicative Tree where
     reify = id
     reflect = id
@@ -1103,8 +1098,6 @@ instance Functor ((->) a) where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained ((->) a) = ((->) a)
-
 instance Applicative ((->) a) where
     reify = id
     reflect = id
@@ -1134,8 +1127,6 @@ instance Functor (ContT r m) where
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (ContT r m) = ContT r m
-
 instance Applicative (ContT r m) where
     reify = id
     reflect = id
@@ -1164,9 +1155,6 @@ instance Functor Control.Applicative.ZipList where
     (<$) = (Prelude.<$)
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
-
-type instance Unconstrained Control.Applicative.ZipList =
-     Control.Applicative.ZipList
 
 instance Applicative Control.Applicative.ZipList where
     reify = id
@@ -1199,11 +1187,11 @@ instance Functor m =>
     x <$ xs = Strict.StateT ((fmap . first) (const x) . Strict.runStateT xs)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (Strict.StateT s m)
-    = Strict.StateT s (Unconstrained m)
-
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (Strict.StateT s m) where
+    type Unconstrained (Strict.StateT s m)
+        = Strict.StateT s (Unconstrained m)
+
     reflect (Strict.StateT xs) = Strict.StateT (reflect . xs)
     {-# INLINE reflect #-}
     pure a =
@@ -1260,10 +1248,10 @@ instance Functor m => Functor (StateT s m) where
     {-# INLINE fmap #-}
     x <$ StateT xs = StateT ((fmap.first) (const x) . xs)
 
-type instance Unconstrained (StateT s m) = StateT s (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (StateT s m) where
+    type Unconstrained (StateT s m) = StateT s (Unconstrained m)
     reflect (StateT xs) = StateT (reflect . xs)
     {-# INLINE reflect #-}
     pure a =
@@ -1313,9 +1301,10 @@ instance (Functor m) => Functor (ReaderT r m) where
     x <$ ReaderT xs = ReaderT (\r -> x <$ xs r)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (ReaderT r m) = ReaderT r (Unconstrained m)
 
 instance (Applicative m) => Applicative (ReaderT r m) where
+    type Unconstrained (ReaderT r m)
+        = ReaderT r (Unconstrained m)
     pure = liftReaderT . pure
     reflect (ReaderT f) = ReaderT (reflect . f)
     {-# INLINE reflect #-}
@@ -1358,10 +1347,10 @@ instance Functor m =>
     x <$ MaybeT xs = MaybeT (fmap (x <$) xs)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (MaybeT m) = MaybeT (Unconstrained m)
 
 instance (Prelude.Monad (Unconstrained m), Monad m) =>
          Applicative (MaybeT m) where
+    type Unconstrained (MaybeT m) = MaybeT (Unconstrained m)
     reflect (MaybeT x) = MaybeT (reflect x)
     {-# INLINE reflect #-}
     pure x = MaybeT (pure (Just x))
@@ -1400,10 +1389,10 @@ instance Functor m =>
     x <$ ExceptT xs = ExceptT (fmap (x <$) xs)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (ExceptT e m) = ExceptT e (Unconstrained m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (ExceptT e m) where
+    type Unconstrained (ExceptT e m) = ExceptT e (Unconstrained m)
     reflect (ExceptT x) = ExceptT (reflect x)
     {-# INLINE reflect #-}
     pure x = ExceptT (pure (Right x))
@@ -1447,9 +1436,9 @@ instance Functor m =>
     {-# INLINE fmap #-}
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (IdentityT m) = IdentityT (Unconstrained m)
 instance Applicative m =>
          Applicative (IdentityT m) where
+    type Unconstrained (IdentityT m) = IdentityT (Unconstrained m)
     reflect (IdentityT x) = IdentityT (reflect x)
     {-# INLINE reflect #-}
     pure = (coerce :: (a -> f a) -> a -> IdentityT f a) pure
@@ -1486,8 +1475,6 @@ instance Functor (ST s) where
     (<$) = (Prelude.<$)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (ST s) = ST s
-
 instance Applicative (ST s) where
     reify = id
     reflect = id
@@ -1517,8 +1504,6 @@ instance Functor (Const a) where
     (<$) = (Prelude.<$)
     {-# INLINE (<$) #-}
 
-type instance Unconstrained (Const a) = Const a
-
 instance Monoid a => Applicative (Const a) where
     reify = id
     reflect = id
@@ -1543,11 +1528,11 @@ instance (Functor f, Functor g) =>
     fmap f (Compose xs) = Compose ((fmap . fmap) f xs)
     {-# INLINE fmap #-}
 
-type instance Unconstrained (Compose f g) =
-     Compose (Unconstrained f) (Unconstrained g)
 
 instance (Applicative f, Applicative g) =>
          Applicative (Compose f g) where
+  type Unconstrained (Compose f g) =
+       Compose (Unconstrained f) (Unconstrained g)
   reify (Compose xs) = Compose (reify (Prelude.fmap reify xs))
   {-# INLINE reify #-}
   reflect (Compose xs) = Compose (Prelude.fmap reflect (reflect xs))
@@ -1564,11 +1549,11 @@ instance (Functor f, Functor g) => Functor (Product f g) where
     fmap f (Pair x y) = Pair (fmap f x) (fmap f y)
     {-# INLINE fmap #-}
 
-type instance Unconstrained (Product f g) =
-     Product (Unconstrained f) (Unconstrained g)
 
 instance (Applicative f, Applicative g) =>
          Applicative (Product f g) where
+    type Unconstrained (Product f g) =
+        Product (Unconstrained f) (Unconstrained g)
     pure x = Pair (pure x) (pure x)
     {-# INLINE pure #-}
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)

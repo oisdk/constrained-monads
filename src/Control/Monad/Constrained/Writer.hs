@@ -164,10 +164,10 @@ instance Functor m => Functor (WriterT s m) where
   fmap f (WriterT_ x) = WriterT_ (fmap f x)
   x <$ WriterT_ xs = WriterT_ (x <$ xs)
 
-type instance Unconstrained (WriterT s m) = Ap (WriterT s m)
 
 instance (Monad m, Prelude.Monad (Unconstrained m)) =>
          Applicative (WriterT s m) where
+    type Unconstrained (WriterT s m) = Ap (WriterT s m)
     pure x = WriterT_ (pure x)
     WriterT_ fs <*> WriterT_ xs = WriterT_ (fs <*> xs)
     WriterT_ xs *> WriterT_ ys = WriterT_ (xs *> ys)

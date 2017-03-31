@@ -116,6 +116,7 @@ instance a ~ Int => Monoid (IntSet a) where
     {-# INLINE mappend #-}
 
 instance Applicative IntSet where
+    type Unconstrained IntSet = StrictLeftFold
     pure x = IntSet (IntSet.singleton x)
     {-# INLINE pure #-}
     xs *> ys =
@@ -133,7 +134,6 @@ instance Applicative IntSet where
     reflect (IntSet xs) = StrictLeftFold (\f b -> IntSet.foldl' f b xs)
     {-# INLINE reflect #-}
 
-type instance Unconstrained IntSet = StrictLeftFold
 
 instance Alternative IntSet where
     empty = mempty

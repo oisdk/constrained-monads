@@ -27,9 +27,9 @@ instance Functor EnumVect where
             | x <- range (minBound, maxBound) ]
     {-# INLINE fmap #-}
 
-type instance Unconstrained EnumVect = Dist
 
 instance Applicative EnumVect where
+    type Unconstrained EnumVect = Dist
     reflect (EnumVect xs) =
         Dist (Prelude.zip (range (minBound, maxBound)) (toList xs))
     reify (Dist (xs :: [(a, Double)])) =

@@ -47,9 +47,9 @@ instance Functor Prob where
     fmap f (Prob xs) = Prob (Map.mapKeysWith (+) f xs)
     {-# INLINE fmap #-}
 
-type instance Unconstrained Prob = Dist
 
 instance Applicative Prob where
+    type Unconstrained Prob = Dist
     reflect = Dist . Map.toList . runProb
     {-# INLINE reflect #-}
     reify = Prob . Map.fromListWith (+) . runDist
