@@ -1,6 +1,8 @@
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE RebindableSyntax #-}
-{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE RebindableSyntax   #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies       #-}
 
 -- | This module creates an 'IntSet' type with a phantom type variable, allowing
 -- it to conform to 'Functor', 'Foldable', etc. Other than that, it's a
@@ -37,11 +39,22 @@ import           GHC.Exts
 
 import           Control.Monad.Constrained.Internal.Unconstrained
 
+import           Data.Data                                        (Data)
+import           Data.Typeable                                    (Typeable)
+
+import           Control.DeepSeq                                  (NFData (..))
+
 -- | This type is a wrapper around 'Data.IntSet.IntSet', with a phantom type
 -- variable which must always be 'Int'. This allows it to conform to 'Functor',
 -- 'Foldable', 'Applicative', 'Monad', etc.
 data IntSet a where
-        IntSet :: IntSet.IntSet -> IntSet Int
+        IntSet :: !IntSet.IntSet -> IntSet Int
+
+deriving instance Typeable (IntSet a)
+deriving instance a ~ Int => Data (IntSet a)
+
+instance NFData (IntSet a) where
+    rnf (IntSet xs) = rnf xs
 
 instance Foldable IntSet where
     foldr f b (IntSet xs) = IntSet.foldr f b xs
