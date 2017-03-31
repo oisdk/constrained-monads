@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes            #-}
@@ -109,7 +110,7 @@ type Final = Final.Ap
 instance (Constrained.Monad f) =>
          Monad (Final f) where
     type Suitable (Final f) a = (Constrained.Suitable f a, Constrained.Suitable f (f a))
-    (>>=) ap f = Final.liftAp (retractAp ap Constrained.>>= (retractAp . f))
+    (>>=) ap f = Final.liftAp (retractAp ap Constrained.>>= retractAp . f)
     {-# INLINE (>>=) #-}
     join = Final.liftAp . Constrained.join . retractAp . fmap retractAp
     {-# INLINE join #-}
@@ -117,11 +118,7 @@ instance (Constrained.Monad f) =>
 newtype Codensity f a = Codensity
     { runCodensity :: forall b. Constrained.Suitable f b =>
                                 (a -> f b) -> f b
-    }
-
-instance Functor (Codensity k) where
-  fmap f (Codensity m) = Codensity (\k -> m (k . f))
-  {-# INLINE fmap #-}
+    } deriving Functor
 
 instance Applicative (Codensity f) where
   pure x = Codensity (\k -> k x)
@@ -202,6 +199,7 @@ return = pure
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse True t _  = t
 ifThenElse False _ f = f
+{-# INLINE ifThenElse #-}
 
 infixl 1 >>
 -- | Sequence two actions, discarding the result of the first. Alias for
@@ -215,26 +213,35 @@ infixl 1 >>
 instance Monad [] where
     type Suitable [] a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance MonadFail [] where
     fail _ = []
+    {-# INLINE fail #-}
 
 instance Monad Maybe where
     type Suitable Maybe a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance MonadFail Maybe where
     fail _ = Nothing
+    {-# INLINE fail #-}
 
 instance Monad IO where
     type Suitable IO a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance MonadFail IO where
     fail = Prelude.fail
+    {-# INLINE fail #-}
 
 instance Monad Identity where
     type Suitable Identity a = ()
@@ -244,47 +251,63 @@ instance Monad Identity where
 instance Monad (Either e) where
     type Suitable (Either e) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance IsString a =>
          MonadFail (Either a) where
     fail = Left . fromString
+    {-# INLINE fail #-}
 
 instance Monoid m =>
          Monad ((,) m) where
     type Suitable ((,) m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Monad Seq where
     type Suitable Seq a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance MonadFail Seq where
     fail _ = Constrained.empty
+    {-# INLINE fail #-}
 
 instance Monad ((->) b) where
     type Suitable ((->) b) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Monad (ContT r m) where
     type Suitable (ContT r m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Prelude.Monad m =>
          Monad (Strict.StateT s m) where
     type Suitable (Strict.StateT s m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Prelude.Monad m =>
          Monad (StateT s m) where
     type Suitable (StateT s m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Monad m =>
          Monad (ReaderT s m) where
@@ -304,25 +327,32 @@ instance Monad m =>
 instance MonadFail m =>
          MonadFail (ReaderT r m) where
     fail = ReaderT . const . fail
+    {-# INLINE fail #-}
 
 instance Prelude.Monad m =>
          Monad (MaybeT m) where
     type Suitable (MaybeT m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance Prelude.Monad m =>
          MonadFail (MaybeT m) where
     fail _ = Control.Monad.mzero
+    {-# INLINE fail #-}
 
 instance Prelude.Monad m =>
          Monad (ExceptT e m) where
     type Suitable (ExceptT e m) a = ()
     (>>=) = (Prelude.>>=)
+    {-# INLINE (>>=) #-}
     join = Control.Monad.join
+    {-# INLINE join #-}
 
 instance (Prelude.Monad m, IsString e) => MonadFail (ExceptT e m) where
     fail = ExceptT . pure . Left . fromString
+    {-# INLINE fail #-}
 
 instance Monad m =>
          Monad (IdentityT m) where
@@ -332,8 +362,11 @@ instance Monad m =>
            :: (f a -> (a -> f b) -> f b)
            -> IdentityT f a -> (a -> IdentityT f b) -> IdentityT f b)
             (>>=)
+    {-# INLINE (>>=) #-}
     join (IdentityT x) = IdentityT (join (fmap runIdentityT x))
+    {-# INLINE join #-}
 
 instance MonadFail m =>
          MonadFail (IdentityT m) where
     fail = IdentityT . fail
+    {-# INLINE fail #-}

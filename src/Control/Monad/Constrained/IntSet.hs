@@ -8,21 +8,39 @@
 -- it to conform to 'Functor', 'Foldable', etc. Other than that, it's a
 -- duplication of the "Data.IntSet" module.
 module Control.Monad.Constrained.IntSet
-  (IntSet
+  ( -- * IntSet type
+    IntSet
+    -- * Operators
   ,(\\)
+    -- * Query
   ,lookupLT
   ,lookupLE
   ,lookupGT
   ,lookupGE
+  ,isSubsetOf
+  ,isProperSubsetOf
+   -- * Construction
   ,insert
   ,delete
+   -- * Combine
   ,difference
   ,intersection
+   -- * Filter
   ,filter
   ,partition
   ,split
+  ,splitMember
+  ,splitRoot
+  -- * Min/Max
   ,maxView
-  ,minView)
+  ,minView
+  ,deleteMin
+  ,deleteMax
+  -- * Ordered List
+  ,toAscList
+  ,toDescList
+  ,fromAscList
+  ,fromDistinctAscList)
   where
 
 import           Control.Monad.Constrained                        hiding
@@ -127,12 +145,13 @@ instance Monad IntSet where
     (>>=) = flip foldMap
     {-# INLINE (>>=) #-}
 
-instance a ~ Int => IsList (IntSet a) where
-  type Item (IntSet a) = a
-  fromList = IntSet . IntSet.fromList
-  {-# INLINE fromList #-}
-  toList = foldr (:) []
-  {-# INLINE toList #-}
+instance a ~ Int =>
+         IsList (IntSet a) where
+    type Item (IntSet a) = a
+    fromList = IntSet . IntSet.fromList
+    {-# INLINE fromList #-}
+    toList = foldr (:) []
+    {-# INLINE toList #-}
 
 infixl 9 \\
 -- | /O(n+m)/. See 'difference'.
@@ -261,3 +280,45 @@ instance Ord a =>
          Ord (IntSet a) where
     compare = compare1
     {-# INLINE compare #-}
+
+isSubsetOf :: IntSet a -> IntSet a -> Bool
+isSubsetOf (IntSet xs) (IntSet ys) = IntSet.isSubsetOf xs ys
+{-# INLINE isSubsetOf #-}
+
+isProperSubsetOf :: IntSet a -> IntSet a -> Bool
+isProperSubsetOf (IntSet xs) (IntSet ys) = IntSet.isProperSubsetOf xs ys
+{-# INLINE isProperSubsetOf #-}
+
+splitMember :: a -> IntSet a -> (IntSet a, Bool, IntSet a)
+splitMember x (IntSet xs) =
+    let (ys,m,zs) = IntSet.splitMember x xs
+    in (IntSet ys, m, IntSet zs)
+{-# INLINE splitMember #-}
+
+splitRoot :: IntSet a -> [IntSet a]
+splitRoot (IntSet xs) = fmap IntSet (IntSet.splitRoot xs)
+{-# INLINE splitRoot #-}
+
+deleteMin :: IntSet a -> IntSet a
+deleteMin (IntSet xs) = IntSet (IntSet.deleteMin xs)
+{-# INLINE deleteMin #-}
+
+deleteMax :: IntSet a -> IntSet a
+deleteMax (IntSet xs) = IntSet (IntSet.deleteMax xs)
+{-# INLINE deleteMax #-}
+
+toAscList :: IntSet a -> [a]
+toAscList (IntSet xs) = IntSet.toAscList xs
+{-# INLINE toAscList #-}
+
+toDescList :: IntSet a -> [a]
+toDescList (IntSet xs) = IntSet.toAscList xs
+{-# INLINE toDescList #-}
+
+fromAscList :: [Int] -> IntSet Int
+fromAscList  = IntSet . IntSet.fromAscList
+{-# INLINE fromAscList #-}
+
+fromDistinctAscList :: [Int] -> IntSet Int
+fromDistinctAscList = IntSet . IntSet.fromDistinctAscList
+{-# INLINE fromDistinctAscList #-}
