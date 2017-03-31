@@ -921,7 +921,7 @@ instance Functor Set where
     {-# INLINE (<$) #-}
 
 
-type instance Unconstrained Set = ChurchSet
+type instance Unconstrained Set = StrictLeftFold
 
 instance Applicative Set where
     pure = Set.singleton
@@ -930,9 +930,9 @@ instance Applicative Set where
     {-# INLINE (*>) #-}
     xs <* ys = if null ys then Set.empty else xs
     {-# INLINE (<*) #-}
-    reify (ChurchSet xs) = xs (flip Set.insert) Set.empty
+    reify (StrictLeftFold xs) = xs (flip Set.insert) Set.empty
     {-# INLINE reify #-}
-    reflect xs = ChurchSet (\f b -> Set.foldl' f b xs)
+    reflect xs = StrictLeftFold (\f b -> Set.foldl' f b xs)
     {-# INLINE reflect #-}
 
 instance Monad Set where

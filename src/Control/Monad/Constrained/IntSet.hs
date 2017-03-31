@@ -80,10 +80,10 @@ instance Applicative IntSet where
         if null ys
             then mempty
             else xs
-    reify (ChurchSet xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
-    reflect (IntSet xs) = ChurchSet (\f b -> IntSet.foldl' f b xs)
+    reify (StrictLeftFold xs) = IntSet (xs (flip IntSet.insert) IntSet.empty)
+    reflect (IntSet xs) = StrictLeftFold (\f b -> IntSet.foldl' f b xs)
 
-type instance Unconstrained IntSet = ChurchSet
+type instance Unconstrained IntSet = StrictLeftFold
 
 instance Alternative IntSet where
     empty = mempty
