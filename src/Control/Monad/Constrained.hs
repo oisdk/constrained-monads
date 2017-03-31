@@ -172,7 +172,7 @@ class Functor f  where
 -- to arbitrary numbers of arguments.
 --
 -- A minimal complete definition must include implementations of 'reflect' and
--- reify which convert to and from a law-abiding applicative, such that they
+-- 'reify' which convert to and from a law-abiding applicative, such that they
 -- form an isomorphism. Alternatively, you can conform to the standard prelude
 -- classes, and satisfy the following laws:
 --
@@ -275,7 +275,7 @@ ap = flip runAp
   where
     runAp :: (Suitable f b, Monad f) => Ap f a -> (a -> f b) -> f b
     runAp (Pure x) = \c -> c x
-    runAp (Ap xs fs) = \c -> runAp fs (\g -> (>>=) xs (c . g))
+    runAp (Ap xs fs) = \c -> xs >>= \x -> runAp fs (\g -> (c . g) x)
 {-# INLINE ap #-}
 
 {- | The 'Monad' class defines the basic operations over a /monad/,

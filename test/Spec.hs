@@ -28,15 +28,12 @@ import           Control.Monad.Trans.State.Strict (StateT(..), State)
 import           Data.Functor.Identity
 
 instance Functor Gen where
-  type Suitable Gen a = ()
   fmap = Prelude.fmap
   (<$) = (Prelude.<$)
 
-type instance Unconstrained Gen = Gen
-
 instance Applicative Gen where
-  eta = id
-  phi = id
+  reify = id
+  reflect = id
 
 instance Monad Gen where
   (>>=) = (Prelude.>>=)
@@ -53,6 +50,7 @@ replaceIsSame
     :: (Functor f, Prelude.Functor f, Suitable f a, Eq (f a), Show (f a))
     => f b -> a -> Property
 replaceIsSame xs x = label "replace is same" $ (x <$ xs) === (x Prelude.<$ xs)
+
 
 pureIsSame
     :: (Applicative f
