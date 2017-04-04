@@ -1,4 +1,4 @@
-s is the simple Travis configuration, which is intended for use
+# this is the simple Travis configuration, which is intended for use
 # on applications which do not require cross-platform and
 # multiple-GHC-version support. For more information and other
 # options, see:
